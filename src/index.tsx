@@ -179,105 +179,138 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     </head>
-    <body class="bg-gray-50 min-h-screen">
+    <body class="min-h-screen">
+        <link href="/static/styles.css" rel="stylesheet">
+        
         <!-- Navigation -->
-        <nav class="bg-white shadow-sm border-b">
-            <div class="max-w-7xl mx-auto px-6 py-4">
+        <nav class="nav-modern">
+            <div class="max-w-7xl mx-auto px-6 py-6">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-8">
-                        <h1 class="text-2xl font-bold text-blue-600">
-                            <i class="fas fa-chart-line mr-2"></i>
+                        <h1 class="text-2xl font-bold text-white">
+                            <i class="fas fa-chart-line mr-3"></i>
                             Asset Tracker
                         </h1>
-                        <nav class="flex space-x-6">
-                            <a href="/" class="text-blue-600 font-medium border-b-2 border-blue-600 pb-1">
-                                <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                        <nav class="hidden md:flex space-x-2">
+                            <a href="/" class="nav-link active">
+                                <i class="fas fa-tachometer-alt mr-2"></i>
+                                Dashboard
                             </a>
-                            <a href="/transactions" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
-                                <i class="fas fa-exchange-alt mr-1"></i>Transacciones
+                            <a href="/transactions" class="nav-link">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
                             </a>
-                            <a href="/wallet" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
-                                <i class="fas fa-wallet mr-1"></i>Wallet
+                            <a href="/wallet" class="nav-link">
+                                <i class="fas fa-wallet mr-2"></i>
+                                Wallet
                             </a>
-                            <a href="/prices" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
-                                <i class="fas fa-search-dollar mr-1"></i>Precios en Vivo
+                            <a href="/prices" class="nav-link">
+                                <i class="fas fa-search-dollar mr-2"></i>
+                                Precios en Vivo
                             </a>
                         </nav>
                     </div>
-                    <button onclick="logout()" class="text-gray-600 hover:text-red-600">
-                        <i class="fas fa-sign-out-alt mr-1"></i>Salir
+                    <button onclick="logout()" class="nav-link hover:bg-red-500">
+                        <i class="fas fa-sign-out-alt mr-2"></i>
+                        Salir
                     </button>
                 </div>
             </div>
         </nav>
 
+        <div class="content-wrapper max-w-7xl mx-auto">
+
         <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8 animate-fadeInUp">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Dashboard Principal</h2>
+                <p class="text-gray-600">Resumen de tu cartera de inversiones</p>
+            </div>
+
             <!-- KPI Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-600">Total Invertido</p>
-                            <p id="total-invested" class="text-2xl font-bold text-gray-800">$0.00</p>
-                        </div>
-                        <div class="bg-blue-100 p-3 rounded-full">
-                            <i class="fas fa-dollar-sign text-blue-600"></i>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="bg-white rounded-xl shadow-sm p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-600">Valor Actual</p>
-                            <p id="current-value" class="text-2xl font-bold text-gray-800">$0.00</p>
-                        </div>
-                        <div class="bg-green-100 p-3 rounded-full">
-                            <i class="fas fa-chart-line text-green-600"></i>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 animate-slideInLeft">
+                <div class="asset-card">
+                    <div class="p-8">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Total Invertido</p>
+                                <p id="total-invested" class="text-3xl font-bold text-gray-800">$0.00</p>
+                            </div>
+                            <div class="bg-blue-100 p-4 rounded-full">
+                                <i class="fas fa-dollar-sign text-2xl text-blue-600"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-sm p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-600">PnL Total</p>
-                            <p id="total-pnl" class="text-2xl font-bold">$0.00</p>
+                <div class="asset-card">
+                    <div class="p-8">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Valor Actual</p>
+                                <p id="current-value" class="text-3xl font-bold text-gray-800">$0.00</p>
+                            </div>
+                            <div class="bg-green-100 p-4 rounded-full">
+                                <i class="fas fa-chart-line text-2xl text-green-600"></i>
+                            </div>
                         </div>
-                        <div id="pnl-icon" class="bg-gray-100 p-3 rounded-full">
-                            <i class="fas fa-balance-scale text-gray-600"></i>
+                    </div>
+                </div>
+                
+                <div class="asset-card">
+                    <div class="p-8">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">PnL Total</p>
+                                <p id="total-pnl" class="text-3xl font-bold">$0.00</p>
+                            </div>
+                            <div id="pnl-icon" class="bg-gray-100 p-4 rounded-full">
+                                <i class="fas fa-balance-scale text-2xl text-gray-600"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Diversification Chart -->
-            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">
-                    <i class="fas fa-pie-chart mr-2 text-blue-600"></i>
-                    Diversificación de Portfolio
-                </h2>
-                <div class="flex justify-center">
-                    <canvas id="diversificationChart" width="400" height="400"></canvas>
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+                <!-- Diversification Chart -->
+                <div class="asset-card animate-fadeInUp">
+                    <div class="p-8">
+                        <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                            <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                                <i class="fas fa-pie-chart text-blue-600"></i>
+                            </div>
+                            Diversificación de Portfolio
+                        </h2>
+                        <div class="flex justify-center">
+                            <canvas id="diversificationChart" width="400" height="400"></canvas>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Recent Transactions -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-800">
-                        <i class="fas fa-history mr-2 text-blue-600"></i>
-                        Últimos Movimientos (3 días)
-                    </h2>
-                    <a href="/transactions" class="text-blue-600 hover:text-blue-700 font-medium">
-                        Ver todos <i class="fas fa-arrow-right ml-1"></i>
-                    </a>
-                </div>
-                <div id="recent-transactions" class="overflow-x-auto">
-                    <!-- Transactions will be loaded here -->
+                <!-- Recent Transactions -->
+                <div class="asset-card animate-fadeInUp">
+                    <div class="p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                                <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                                    <i class="fas fa-history text-blue-600"></i>
+                                </div>
+                                Últimos Movimientos
+                            </h2>
+                            <a href="/transactions" class="btn-modern-primary text-sm px-4 py-2">
+                                Ver todos <i class="fas fa-arrow-right ml-2"></i>
+                            </a>
+                        </div>
+                        <div id="recent-transactions" class="overflow-x-auto">
+                            <!-- Transactions will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
         </div>
 
         <script>
@@ -378,43 +411,48 @@ app.get('/', (c) => {
                 const container = document.getElementById('recent-transactions');
                 
                 if (transactions.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500 text-center py-4">No hay transacciones recientes</p>';
+                    container.innerHTML = '<div class="text-center py-8"><i class="fas fa-receipt text-4xl text-gray-300 mb-4"></i><p class="text-gray-500">No hay transacciones recientes</p></div>';
                     return;
                 }
 
                 const tableHTML = \`
-                    <table class="min-w-full">
-                        <thead class="bg-gray-50">
+                    <table class="table-modern w-full">
+                        <thead>
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Activo</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Exchange</th>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Activo</th>
+                                <th>Cantidad</th>
+                                <th>Precio</th>
+                                <th>Total</th>
+                                <th>Exchange</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200">
+                        <tbody>
                             \${transactions.map(tx => \`
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-3 text-sm text-gray-600">
+                                <tr>
+                                    <td class="text-gray-600 font-medium">
                                         \${new Date(tx.transaction_date).toLocaleDateString('es-ES')}
                                     </td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full \${
-                                            tx.type === 'buy' ? 'bg-green-100 text-green-800' : 
-                                            tx.type === 'sell' ? 'bg-red-100 text-red-800' : 
-                                            'bg-blue-100 text-blue-800'
+                                    <td>
+                                        <span class="transaction-badge \${
+                                            tx.type === 'buy' ? 'badge-buy' : 
+                                            tx.type === 'sell' ? 'badge-sell' : 
+                                            'badge-trade'
                                         }">
+                                            <i class="fas \${
+                                                tx.type === 'buy' ? 'fa-arrow-up' : 
+                                                tx.type === 'sell' ? 'fa-arrow-down' : 
+                                                'fa-exchange-alt'
+                                            } mr-1"></i>
                                             \${tx.type === 'buy' ? 'Compra' : tx.type === 'sell' ? 'Venta' : 'Trade'}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-800">\${tx.asset_symbol}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">\${tx.quantity}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">$\${tx.price_per_unit.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">$\${tx.total_amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-600">\${tx.exchange}</td>
+                                    <td class="font-semibold text-gray-800">\${tx.asset_symbol}</td>
+                                    <td class="text-gray-600">\${parseFloat(tx.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}</td>
+                                    <td class="text-gray-600 font-medium">$\${parseFloat(tx.price_per_unit).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                    <td class="text-gray-800 font-semibold">$\${parseFloat(tx.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                    <td class="text-gray-500">\${tx.exchange}</td>
                                 </tr>
                             \`).join('')}
                         </tbody>
@@ -3193,55 +3231,60 @@ app.get('/wallet', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <link href="/static/styles.css" rel="stylesheet">
     </head>
-    <body class="bg-gray-50 min-h-screen">
+    <body class="min-h-screen">
         <!-- Navigation -->
-        <nav class="bg-white shadow-sm border-b">
-            <div class="max-w-7xl mx-auto px-6 py-4">
+        <nav class="nav-modern">
+            <div class="max-w-7xl mx-auto px-6 py-6">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-8">
-                        <h1 class="text-2xl font-bold text-blue-600">
-                            <i class="fas fa-chart-line mr-2"></i>
+                        <h1 class="text-2xl font-bold text-white">
+                            <i class="fas fa-chart-line mr-3"></i>
                             Asset Tracker
                         </h1>
-                        <nav class="flex space-x-6">
-                            <a href="/" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
-                                <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                        <nav class="hidden md:flex space-x-2">
+                            <a href="/" class="nav-link">
+                                <i class="fas fa-tachometer-alt mr-2"></i>
+                                Dashboard
                             </a>
-                            <a href="/transactions" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
-                                <i class="fas fa-exchange-alt mr-1"></i>Transacciones
+                            <a href="/transactions" class="nav-link">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
                             </a>
-                            <a href="/wallet" class="text-blue-600 font-medium border-b-2 border-blue-600 pb-1">
-                                <i class="fas fa-wallet mr-1"></i>Wallet
+                            <a href="/wallet" class="nav-link active">
+                                <i class="fas fa-wallet mr-2"></i>
+                                Wallet
                             </a>
-                            <a href="/prices" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
-                                <i class="fas fa-search-dollar mr-1"></i>Precios en Vivo
+                            <a href="/prices" class="nav-link">
+                                <i class="fas fa-search-dollar mr-2"></i>
+                                Precios en Vivo
                             </a>
                         </nav>
                     </div>
-                    <button onclick="logout()" class="text-gray-600 hover:text-red-600">
-                        <i class="fas fa-sign-out-alt mr-1"></i>Salir
+                    <button onclick="logout()" class="nav-link hover:bg-red-500">
+                        <i class="fas fa-sign-out-alt mr-2"></i>
+                        Salir
                     </button>
                 </div>
             </div>
         </nav>
 
+        <div class="content-wrapper max-w-7xl mx-auto">
         <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-6 py-8">
-            <!-- Header with Actions -->
-            <div class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-800">
-                        <i class="fas fa-wallet mr-3 text-blue-600"></i>
-                        Mi Wallet
-                    </h2>
-                    <p class="text-gray-600 mt-2">Gestiona y monitorea todos tus activos financieros</p>
-                </div>
-                <div class="flex space-x-3">
-                    <button onclick="updateAllPrices()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+        <div class="px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8 animate-fadeInUp">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Mi Wallet</h2>
+                <p class="text-gray-600">Gestiona tus activos e inversiones</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-end items-center mb-8 animate-slideInLeft">
+                <div class="flex space-x-4">
+                    <button onclick="updateAllPrices()" class="btn-modern-success">
                         <i class="fas fa-sync-alt mr-2"></i>
                         Actualizar Precios
                     </button>
-                    <a href="/transactions" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <a href="/transactions" class="btn-modern-primary">
                         <i class="fas fa-plus mr-2"></i>
                         Nueva Transacción
                     </a>
@@ -3249,29 +3292,32 @@ app.get('/wallet', (c) => {
             </div>
 
             <!-- Category Filters -->
-            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
-                <div class="flex flex-wrap gap-3">
-                    <button onclick="filterByCategory('all')" id="filter-all" class="category-filter active px-4 py-2 rounded-full text-sm font-medium">
-                        <i class="fas fa-globe mr-2"></i>
-                        Todos los Activos
-                    </button>
-                    <button onclick="filterByCategory('crypto')" id="filter-crypto" class="category-filter px-4 py-2 rounded-full text-sm font-medium">
-                        <i class="fab fa-bitcoin mr-2"></i>
-                        Criptomonedas
-                    </button>
-                    <button onclick="filterByCategory('stocks')" id="filter-stocks" class="category-filter px-4 py-2 rounded-full text-sm font-medium">
-                        <i class="fas fa-chart-bar mr-2"></i>
-                        Acciones
-                    </button>
-                    <button onclick="filterByCategory('etfs')" id="filter-etfs" class="category-filter px-4 py-2 rounded-full text-sm font-medium">
-                        <i class="fas fa-layer-group mr-2"></i>
-                        ETFs
-                    </button>
+            <div class="asset-card mb-8 animate-fadeInUp">
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Filtrar por Categoría</h3>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="filterByCategory('all')" id="filter-all" class="category-filter active">
+                            <i class="fas fa-globe mr-2"></i>
+                            Todos los Activos
+                        </button>
+                        <button onclick="filterByCategory('crypto')" id="filter-crypto" class="category-filter">
+                            <i class="fab fa-bitcoin mr-2"></i>
+                            Criptomonedas
+                        </button>
+                        <button onclick="filterByCategory('stocks')" id="filter-stocks" class="category-filter">
+                            <i class="fas fa-chart-bar mr-2"></i>
+                            Acciones
+                        </button>
+                        <button onclick="filterByCategory('etfs')" id="filter-etfs" class="category-filter">
+                            <i class="fas fa-layer-group mr-2"></i>
+                            ETFs
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- Holdings Grid -->
-            <div id="holdingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div id="holdingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 <!-- Holdings cards will be loaded here -->
                 <div class="col-span-full flex items-center justify-center py-12">
                     <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mr-3"></i>
@@ -3348,19 +3394,26 @@ app.get('/wallet', (c) => {
                                          holding.category === 'etfs' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800';
 
                     return \`
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
-                             onclick="openAssetDetail('\${holding.asset_symbol}')">
+                        <div class="asset-card \${holding.category} animate-fadeInUp" 
+                             onclick="openAssetDetail('\${holding.asset_symbol}')"
+                             style="animation-delay: 0.1s;">
                             <!-- Card Header -->
-                            <div class="p-6 border-b border-gray-100">
+                            <div class="asset-card-header">
                                 <div class="flex justify-between items-start">
                                     <div class="flex items-center">
-                                        <i class="\${categoryIcon} text-2xl text-gray-600 mr-3"></i>
+                                        <div class="bg-blue-100 p-3 rounded-full mr-4">
+                                            <i class="\${categoryIcon} text-xl text-blue-600"></i>
+                                        </div>
                                         <div>
-                                            <h3 class="text-lg font-bold text-gray-800">\${holding.asset_symbol}</h3>
-                                            <p class="text-sm text-gray-600">\${holding.name}</p>
+                                            <h3 class="asset-symbol">\${holding.asset_symbol}</h3>
+                                            <p class="asset-name">\${holding.name}</p>
                                         </div>
                                     </div>
-                                    <span class="px-2 py-1 text-xs font-medium rounded-full \${categoryColor}">
+                                    <span class="transaction-badge \${
+                                        holding.category === 'crypto' ? 'badge-buy' :
+                                        holding.category === 'stocks' ? 'badge-sell' :
+                                        'badge-trade'
+                                    }">
                                         \${holding.category === 'crypto' ? 'Crypto' :
                                           holding.category === 'stocks' ? 'Acción' :
                                           holding.category === 'etfs' ? 'ETF' : 'Otro'}
@@ -3371,49 +3424,51 @@ app.get('/wallet', (c) => {
                             <!-- Card Body -->
                             <div class="p-6">
                                 <!-- Holdings Info -->
-                                <div class="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Cantidad</p>
-                                        <p class="text-lg font-semibold text-gray-800">
+                                <div class="grid grid-cols-2 gap-6 mb-6">
+                                    <div class="text-center">
+                                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Cantidad</p>
+                                        <p class="text-xl font-bold text-gray-800">
                                             \${parseFloat(holding.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
                                         </p>
                                     </div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Precio Actual</p>
-                                        <p class="text-lg font-semibold text-gray-800">
+                                    <div class="text-center">
+                                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Precio Actual</p>
+                                        <p class="text-xl font-bold text-gray-800">
                                             $\${parseFloat(holding.current_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                         </p>
                                     </div>
                                 </div>
 
                                 <!-- Investment Summary -->
-                                <div class="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Invertido</p>
-                                        <p class="text-sm text-gray-700">
+                                <div class="grid grid-cols-2 gap-6 mb-6">
+                                    <div class="text-center">
+                                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Invertido</p>
+                                        <p class="text-lg font-semibold text-gray-700">
                                             $\${parseFloat(holding.total_invested).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                         </p>
                                     </div>
-                                    <div>
-                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Valor Actual</p>
-                                        <p class="text-sm font-medium text-gray-800">
+                                    <div class="text-center">
+                                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Valor Actual</p>
+                                        <p class="text-lg font-bold text-gray-800">
                                             $\${parseFloat(holding.current_value).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                         </p>
                                     </div>
                                 </div>
 
                                 <!-- PnL Display -->
-                                <div class="border rounded-lg p-3 \${pnlBg}">
+                                <div class="\${holding.unrealized_pnl >= 0 ? 'pnl-positive' : 'pnl-negative'} mb-4">
                                     <div class="flex justify-between items-center">
                                         <div>
-                                            <p class="text-xs text-gray-600 mb-1">Ganancia/Pérdida</p>
-                                            <p class="font-bold \${pnlColor}">
-                                                <i class="fas \${pnlIcon} mr-1"></i>
+                                            <p class="text-xs font-semibold mb-2">Ganancia/Pérdida</p>
+                                            <p class="text-xl font-bold flex items-center">
+                                                <span class="\${holding.unrealized_pnl >= 0 ? 'pnl-icon-positive' : 'pnl-icon-negative'} mr-3">
+                                                    <i class="fas \${pnlIcon}"></i>
+                                                </span>
                                                 $\${Math.abs(holding.unrealized_pnl).toLocaleString('en-US', {minimumFractionDigits: 2})}
                                             </p>
                                         </div>
                                         <div class="text-right">
-                                            <p class="text-xs text-gray-600 mb-1">Porcentaje</p>
+                                            <p class="text-xs font-semibold mb-2">Porcentaje</p>
                                             <p class="font-bold \${pnlColor}">
                                                 \${Math.abs(holding.pnl_percentage || 0).toFixed(2)}%
                                             </p>

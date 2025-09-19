@@ -1,88 +1,482 @@
-/* Asset Tracker Custom Styles */
+/* Asset Tracker - Modern Design System */
 
-/* Search results custom styling */
+/* ==========================================
+   CUSTOM COLOR PALETTE
+   ========================================== */
+:root {
+  /* Primary Blues */
+  --primary-blue: #1e40af;
+  --primary-blue-light: #3b82f6;
+  --primary-blue-dark: #1e3a8a;
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-600: #2563eb;
+  
+  /* Sophisticated Grays */
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+  
+  /* Success Greens */
+  --green-50: #f0fdf4;
+  --green-100: #dcfce7;
+  --green-200: #bbf7d0;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --green-700: #15803d;
+  
+  /* Alert Reds */
+  --red-50: #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+  
+  /* Gradients */
+  --gradient-blue: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  --gradient-danger: linear-gradient(135deg, #ff5858 0%, #f857a6 100%);
+  --gradient-neutral: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+/* ==========================================
+   GLOBAL BACKGROUND & BASE STYLES
+   ========================================== */
+body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Content wrapper with subtle background */
+.content-wrapper {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  margin: 20px;
+  overflow: hidden;
+}
+
+/* ==========================================
+   NAVIGATION STYLING
+   ========================================== */
+.nav-modern {
+  background: var(--gradient-blue);
+  border: none;
+  box-shadow: 0 10px 25px rgba(30, 64, 175, 0.3);
+}
+
+.nav-modern .nav-link {
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-radius: 10px;
+  padding: 8px 16px;
+  margin: 0 4px;
+}
+
+.nav-modern .nav-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.nav-modern .nav-link.active {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================
+   ASSET CARDS - MODERN DESIGN
+   ========================================== */
+.asset-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--gray-200);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.asset-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  border-color: var(--primary-blue-light);
+}
+
+.asset-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-blue);
+}
+
+/* Asset card categories with color coding */
+.asset-card.crypto::before {
+  background: var(--gradient-blue);
+}
+
+.asset-card.stocks::before {
+  background: var(--gradient-success);
+}
+
+.asset-card.etfs::before {
+  background: var(--gradient-neutral);
+}
+
+/* Asset card headers */
+.asset-card-header {
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+  padding: 20px;
+}
+
+.asset-symbol {
+  color: var(--gray-800);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.asset-name {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+/* ==========================================
+   PnL DISPLAYS WITH COLOR SYSTEM
+   ========================================== */
+.pnl-positive {
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  color: var(--green-700);
+  border-radius: 15px;
+  padding: 16px;
+}
+
+.pnl-negative {
+  background: var(--red-50);
+  border: 1px solid var(--red-200);
+  color: var(--red-700);
+  border-radius: 15px;
+  padding: 16px;
+}
+
+.pnl-neutral {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  color: var(--gray-700);
+  border-radius: 15px;
+  padding: 16px;
+}
+
+/* PnL icons with matching backgrounds */
+.pnl-icon-positive {
+  background: var(--green-100);
+  color: var(--green-600);
+  padding: 12px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pnl-icon-negative {
+  background: var(--red-100);
+  color: var(--red-600);
+  padding: 12px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================
+   BUTTONS - MODERN STYLING
+   ========================================== */
+.btn-modern-primary {
+  background: var(--gradient-blue);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+}
+
+.btn-modern-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 64, 175, 0.4);
+}
+
+.btn-modern-success {
+  background: var(--gradient-success);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.btn-modern-danger {
+  background: var(--gradient-danger);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+/* ==========================================
+   FORM ELEMENTS
+   ========================================== */
+.form-modern {
+  background: white;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+}
+
+.form-modern:focus {
+  border-color: var(--primary-blue-light);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.form-error {
+  border-color: var(--red-500) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.form-success {
+  border-color: var(--green-500) !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1) !important;
+}
+
+/* ==========================================
+   CATEGORY FILTERS
+   ========================================== */
+.category-filter {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.category-filter:hover {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+}
+
+.category-filter.active {
+  background: var(--gradient-blue);
+  color: white;
+  border-color: var(--primary-blue);
+  box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+}
+
+/* ==========================================
+   SEARCH RESULTS & DROPDOWNS
+   ========================================== */
 #searchResults {
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
 }
 
-/* Transaction type badges */
+#searchResults .search-result-item {
+  padding: 15px;
+  border-bottom: 1px solid var(--gray-100);
+  transition: all 0.2s ease;
+}
+
+#searchResults .search-result-item:hover {
+  background: var(--blue-50);
+  cursor: pointer;
+}
+
+/* ==========================================
+   TRANSACTION BADGES
+   ========================================== */
 .transaction-badge {
-    transition: all 0.2s ease-in-out;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 12px;
+  transition: all 0.2s ease;
 }
 
-/* Loading states */
+.badge-buy {
+  background: var(--green-100);
+  color: var(--green-700);
+  border: 1px solid var(--green-200);
+}
+
+.badge-sell {
+  background: var(--red-100);
+  color: var(--red-700);
+  border: 1px solid var(--red-200);
+}
+
+.badge-trade {
+  background: var(--blue-100);
+  color: var(--blue-700);
+  border: 1px solid var(--blue-200);
+}
+
+/* ==========================================
+   TABLES - MODERN STYLING
+   ========================================== */
+.table-modern {
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--gray-200);
+}
+
+.table-modern th {
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-weight: 600;
+  border-bottom: 2px solid var(--gray-200);
+  padding: 16px;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-modern td {
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+
+.table-modern tr:hover {
+  background: var(--gray-50);
+}
+
+/* ==========================================
+   ANIMATIONS & TRANSITIONS
+   ========================================== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.6s ease-out;
+}
+
+/* ==========================================
+   LOADING STATES
+   ========================================== */
 .loading-spinner {
-    animation: spin 1s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Hover effects for transaction rows */
-.transaction-row:hover {
-    background-color: #f9fafb;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s ease-in-out;
+.loading-pulse {
+  animation: pulse 2s infinite;
 }
 
-/* Asset search input focus */
-#assetSearch:focus {
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
-/* Selected asset styling */
-#selectedAsset {
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Custom scrollbar for search results */
-#searchResults::-webkit-scrollbar {
-    width: 6px;
-}
-
-#searchResults::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-#searchResults::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-#searchResults::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
-}
-
-/* Form validation styles */
-.form-error {
-    border-color: #ef4444 !important;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
-}
-
-/* Success states */
-.form-success {
-    border-color: #10b981 !important;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
-}
-
-/* Responsive table */
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
 @media (max-width: 768px) {
-    .transaction-table {
-        font-size: 0.875rem;
-    }
-    
-    .transaction-table th,
-    .transaction-table td {
-        padding: 0.5rem 0.25rem;
-    }
+  .content-wrapper {
+    margin: 10px;
+    border-radius: 15px;
+  }
+  
+  .asset-card {
+    border-radius: 15px;
+  }
+  
+  .table-modern th,
+  .table-modern td {
+    padding: 12px 8px;
+    font-size: 0.875rem;
+  }
+}
+
+/* ==========================================
+   CUSTOM SCROLLBARS
+   ========================================== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-500);
 }
