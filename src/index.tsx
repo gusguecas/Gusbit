@@ -1826,8 +1826,745 @@ app.get('/transactions', (c) => {
   `)
 })
 
+// ============================================
+// API ROUTES - WALLET & HOLDINGS
+// ============================================
+
+// Get all current holdings
+app.get('/api/wallet/holdings', async (c) => {
+  try {
+    const category = c.req.query('category') // 'crypto', 'stocks', 'etfs', or 'all'
+    
+    let query = `
+      SELECT 
+        h.*,
+        a.name,
+        a.category,
+        a.subcategory,
+        a.current_price,
+        a.price_updated_at,
+        ((h.current_value - h.total_invested) / h.total_invested) * 100 as pnl_percentage
+      FROM holdings h
+      JOIN assets a ON h.asset_symbol = a.symbol
+      WHERE h.quantity > 0
+    `
+    
+    const params = []
+    if (category && category !== 'all') {
+      query += ' AND a.category = ?'
+      params.push(category)
+    }
+    
+    query += ' ORDER BY h.current_value DESC'
+    
+    const holdings = await c.env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      holdings: holdings.results,
+      total_holdings: holdings.results.length
+    })
+  } catch (error) {
+    return c.json({ error: 'Error fetching holdings' }, 500)
+  }
+})
+
+// Get detailed asset information for individual view
+app.get('/api/wallet/asset/:symbol', async (c) => {
+  try {
+    const symbol = c.req.param('symbol')
+    
+    // Get holding info
+    const holding = await c.env.DB.prepare(`
+      SELECT 
+        h.*,
+        a.name,
+        a.category,
+        a.subcategory,
+        a.current_price,
+        a.price_updated_at,
+        ((h.current_value - h.total_invested) / h.total_invested) * 100 as pnl_percentage
+      FROM holdings h
+      JOIN assets a ON h.asset_symbol = a.symbol
+      WHERE h.asset_symbol = ?
+    `).bind(symbol).first()
+    
+    if (!holding) {
+      return c.json({ error: 'Asset not found in holdings' }, 404)
+    }
+    
+    // Get transaction history for this asset
+    const transactions = await c.env.DB.prepare(`
+      SELECT * FROM transactions 
+      WHERE asset_symbol = ? 
+      ORDER BY transaction_date DESC
+      LIMIT 50
+    `).bind(symbol).all()
+    
+    // Get price history (if available)
+    const priceHistory = await c.env.DB.prepare(`
+      SELECT * FROM price_history 
+      WHERE asset_symbol = ? 
+      ORDER BY timestamp DESC
+      LIMIT 100
+    `).bind(symbol).all()
+    
+    // Get daily snapshots from July 21, 2025
+    const dailySnapshots = await c.env.DB.prepare(`
+      SELECT * FROM daily_snapshots 
+      WHERE asset_symbol = ? AND snapshot_date >= '2025-07-21'
+      ORDER BY snapshot_date ASC
+    `).bind(symbol).all()
+    
+    return c.json({
+      holding,
+      transactions: transactions.results,
+      price_history: priceHistory.results,
+      daily_snapshots: dailySnapshots.results
+    })
+  } catch (error) {
+    return c.json({ error: 'Error fetching asset details' }, 500)
+  }
+})
+
+// Update current prices for all holdings
+app.post('/api/wallet/update-prices', async (c) => {
+  try {
+    const holdings = await c.env.DB.prepare('SELECT DISTINCT asset_symbol FROM holdings WHERE quantity > 0').all()
+    
+    let updatedCount = 0
+    
+    for (const holding of holdings.results) {
+      const asset = await c.env.DB.prepare('SELECT * FROM assets WHERE symbol = ?').bind(holding.asset_symbol).first()
+      
+      if (!asset) continue
+      
+      let newPrice = 0
+      
+      // Fetch current price based on API source
+      if (asset.api_source === 'coingecko' && asset.api_id) {
+        try {
+          const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${asset.api_id}&vs_currencies=usd`)
+          if (response.ok) {
+            const data = await response.json()
+            newPrice = data[asset.api_id]?.usd || 0
+          }
+        } catch (error) {
+          console.log(`Error fetching price for ${asset.symbol}:`, error)
+        }
+      } else if (asset.api_source === 'alphavantage') {
+        // Mock prices for demo (in production, use Alpha Vantage API)
+        const mockPrices = {
+          'AAPL': 175.50 + (Math.random() - 0.5) * 10,
+          'MSFT': 420.30 + (Math.random() - 0.5) * 20,
+          'GOOGL': 140.25 + (Math.random() - 0.5) * 10,
+          'SPY': 450.80 + (Math.random() - 0.5) * 15,
+          'QQQ': 380.90 + (Math.random() - 0.5) * 15
+        }
+        newPrice = mockPrices[asset.symbol] || asset.current_price || 100
+      }
+      
+      if (newPrice > 0) {
+        // Update asset price
+        await c.env.DB.prepare(`
+          UPDATE assets 
+          SET current_price = ?, price_updated_at = ?, updated_at = ?
+          WHERE symbol = ?
+        `).bind(
+          newPrice,
+          new Date().toISOString(),
+          new Date().toISOString(),
+          asset.symbol
+        ).run()
+        
+        // Update holdings
+        await updateHoldings(c.env.DB, asset.symbol)
+        updatedCount++
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      updated_assets: updatedCount,
+      message: `Precios actualizados para ${updatedCount} activos`
+    })
+  } catch (error) {
+    return c.json({ error: 'Error updating prices' }, 500)
+  }
+})
+
+// ============================================
+// WALLET PAGE
+// ============================================
+
 app.get('/wallet', (c) => {
-  return c.html('<h1>Sección Wallet - En desarrollo</h1>')
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Asset Tracker - Mi Wallet</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <link href="/static/styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-8">
+                        <h1 class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            Asset Tracker
+                        </h1>
+                        <nav class="flex space-x-6">
+                            <a href="/" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                            </a>
+                            <a href="/transactions" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-exchange-alt mr-1"></i>Transacciones
+                            </a>
+                            <a href="/wallet" class="text-blue-600 font-medium border-b-2 border-blue-600 pb-1">
+                                <i class="fas fa-wallet mr-1"></i>Wallet
+                            </a>
+                            <a href="/prices" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-search-dollar mr-1"></i>Precios en Vivo
+                            </a>
+                        </nav>
+                    </div>
+                    <button onclick="logout()" class="text-gray-600 hover:text-red-600">
+                        <i class="fas fa-sign-out-alt mr-1"></i>Salir
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="max-w-7xl mx-auto px-6 py-8">
+            <!-- Header with Actions -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800">
+                        <i class="fas fa-wallet mr-3 text-blue-600"></i>
+                        Mi Wallet
+                    </h2>
+                    <p class="text-gray-600 mt-2">Gestiona y monitorea todos tus activos financieros</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="updateAllPrices()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Actualizar Precios
+                    </button>
+                    <a href="/transactions" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nueva Transacción
+                    </a>
+                </div>
+            </div>
+
+            <!-- Category Filters -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="filterByCategory('all')" id="filter-all" class="category-filter active px-4 py-2 rounded-full text-sm font-medium">
+                        <i class="fas fa-globe mr-2"></i>
+                        Todos los Activos
+                    </button>
+                    <button onclick="filterByCategory('crypto')" id="filter-crypto" class="category-filter px-4 py-2 rounded-full text-sm font-medium">
+                        <i class="fab fa-bitcoin mr-2"></i>
+                        Criptomonedas
+                    </button>
+                    <button onclick="filterByCategory('stocks')" id="filter-stocks" class="category-filter px-4 py-2 rounded-full text-sm font-medium">
+                        <i class="fas fa-chart-bar mr-2"></i>
+                        Acciones
+                    </button>
+                    <button onclick="filterByCategory('etfs')" id="filter-etfs" class="category-filter px-4 py-2 rounded-full text-sm font-medium">
+                        <i class="fas fa-layer-group mr-2"></i>
+                        ETFs
+                    </button>
+                </div>
+            </div>
+
+            <!-- Holdings Grid -->
+            <div id="holdingsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Holdings cards will be loaded here -->
+                <div class="col-span-full flex items-center justify-center py-12">
+                    <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mr-3"></i>
+                    <span class="text-gray-600 text-lg">Cargando activos...</span>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden bg-white rounded-xl shadow-sm p-12 text-center">
+                <i class="fas fa-wallet text-gray-300 text-6xl mb-4"></i>
+                <h3 class="text-xl font-medium text-gray-600 mb-2">No tienes activos en esta categoría</h3>
+                <p class="text-gray-500 mb-6">Comienza registrando tu primera transacción</p>
+                <a href="/transactions" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-plus mr-2"></i>
+                    Registrar Transacción
+                </a>
+            </div>
+        </div>
+
+        <!-- Asset Detail Modal -->
+        <div id="assetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-full overflow-y-auto">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <span id="modalAssetSymbol" class="text-2xl font-bold text-gray-800"></span>
+                            <span id="modalAssetName" class="text-gray-600 ml-3"></span>
+                            <span id="modalAssetCategory" class="ml-3 px-3 py-1 text-xs font-medium rounded-full"></span>
+                        </div>
+                        <button onclick="closeAssetModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6" id="modalContent">
+                    <!-- Modal content will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Global variables
+            let currentCategory = 'all';
+            let allHoldings = [];
+
+            // Initialize page
+            document.addEventListener('DOMContentLoaded', function() {
+                loadHoldings();
+            });
+
+            // Load holdings based on category
+            async function loadHoldings(category = 'all') {
+                try {
+                    showLoadingState();
+                    
+                    const response = await axios.get(\`/api/wallet/holdings?category=\${category}\`);
+                    const { holdings } = response.data;
+                    
+                    allHoldings = holdings;
+                    displayHoldings(holdings);
+                    
+                } catch (error) {
+                    console.error('Error loading holdings:', error);
+                    showErrorState();
+                }
+            }
+
+            // Display holdings as cards
+            function displayHoldings(holdings) {
+                const container = document.getElementById('holdingsContainer');
+                const emptyState = document.getElementById('emptyState');
+                
+                if (holdings.length === 0) {
+                    container.classList.add('hidden');
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                container.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+
+                const cardsHTML = holdings.map(holding => {
+                    const pnlColor = holding.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600';
+                    const pnlIcon = holding.unrealized_pnl >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                    const pnlBg = holding.unrealized_pnl >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+                    
+                    const categoryIcon = holding.category === 'crypto' ? 'fab fa-bitcoin' :
+                                        holding.category === 'stocks' ? 'fas fa-chart-line' :
+                                        holding.category === 'etfs' ? 'fas fa-layer-group' : 'fas fa-coins';
+                    
+                    const categoryColor = holding.category === 'crypto' ? 'bg-orange-100 text-orange-800' :
+                                         holding.category === 'stocks' ? 'bg-blue-100 text-blue-800' :
+                                         holding.category === 'etfs' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800';
+
+                    return \`
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                             onclick="openAssetDetail('\${holding.asset_symbol}')">
+                            <!-- Card Header -->
+                            <div class="p-6 border-b border-gray-100">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex items-center">
+                                        <i class="\${categoryIcon} text-2xl text-gray-600 mr-3"></i>
+                                        <div>
+                                            <h3 class="text-lg font-bold text-gray-800">\${holding.asset_symbol}</h3>
+                                            <p class="text-sm text-gray-600">\${holding.name}</p>
+                                        </div>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full \${categoryColor}">
+                                        \${holding.category === 'crypto' ? 'Crypto' :
+                                          holding.category === 'stocks' ? 'Acción' :
+                                          holding.category === 'etfs' ? 'ETF' : 'Otro'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="p-6">
+                                <!-- Holdings Info -->
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Cantidad</p>
+                                        <p class="text-lg font-semibold text-gray-800">
+                                            \${parseFloat(holding.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Precio Actual</p>
+                                        <p class="text-lg font-semibold text-gray-800">
+                                            $\${parseFloat(holding.current_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Investment Summary -->
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Invertido</p>
+                                        <p class="text-sm text-gray-700">
+                                            $\${parseFloat(holding.total_invested).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-500 uppercase tracking-wide">Valor Actual</p>
+                                        <p class="text-sm font-medium text-gray-800">
+                                            $\${parseFloat(holding.current_value).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- PnL Display -->
+                                <div class="border rounded-lg p-3 \${pnlBg}">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <p class="text-xs text-gray-600 mb-1">Ganancia/Pérdida</p>
+                                            <p class="font-bold \${pnlColor}">
+                                                <i class="fas \${pnlIcon} mr-1"></i>
+                                                $\${Math.abs(holding.unrealized_pnl).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                            </p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-xs text-gray-600 mb-1">Porcentaje</p>
+                                            <p class="font-bold \${pnlColor}">
+                                                \${Math.abs(holding.pnl_percentage || 0).toFixed(2)}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Last Update -->
+                                <div class="mt-4 text-xs text-gray-500 text-center">
+                                    Actualizado: \${new Date(holding.price_updated_at || holding.last_updated).toLocaleString('es-ES')}
+                                </div>
+                            </div>
+                        </div>
+                    \`;
+                }).join('');
+
+                container.innerHTML = cardsHTML;
+            }
+
+            // Filter holdings by category
+            function filterByCategory(category) {
+                currentCategory = category;
+                
+                // Update filter buttons
+                document.querySelectorAll('.category-filter').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.getElementById(\`filter-\${category}\`).classList.add('active');
+                
+                // Load filtered holdings
+                loadHoldings(category);
+            }
+
+            // Update all asset prices
+            async function updateAllPrices() {
+                try {
+                    const btn = event.target;
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Actualizando...';
+                    btn.disabled = true;
+                    
+                    const response = await axios.post('/api/wallet/update-prices');
+                    
+                    if (response.data.success) {
+                        alert(response.data.message);
+                        // Reload current view
+                        loadHoldings(currentCategory);
+                    } else {
+                        alert('Error actualizando precios');
+                    }
+                    
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                } catch (error) {
+                    console.error('Error updating prices:', error);
+                    alert('Error actualizando precios');
+                    
+                    const btn = event.target;
+                    btn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Actualizar Precios';
+                    btn.disabled = false;
+                }
+            }
+
+            // Open asset detail modal
+            async function openAssetDetail(symbol) {
+                try {
+                    const modal = document.getElementById('assetModal');
+                    const modalContent = document.getElementById('modalContent');
+                    
+                    // Show loading in modal
+                    modalContent.innerHTML = \`
+                        <div class="flex items-center justify-center py-12">
+                            <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mr-3"></i>
+                            <span class="text-gray-600">Cargando información del activo...</span>
+                        </div>
+                    \`;
+                    
+                    modal.classList.remove('hidden');
+                    
+                    // Fetch detailed asset info
+                    const response = await axios.get(\`/api/wallet/asset/\${symbol}\`);
+                    const { holding, transactions, daily_snapshots } = response.data;
+                    
+                    // Update modal header
+                    document.getElementById('modalAssetSymbol').textContent = holding.asset_symbol;
+                    document.getElementById('modalAssetName').textContent = holding.name;
+                    
+                    const categoryClass = holding.category === 'crypto' ? 'bg-orange-100 text-orange-800' :
+                                         holding.category === 'stocks' ? 'bg-blue-100 text-blue-800' :
+                                         'bg-purple-100 text-purple-800';
+                    document.getElementById('modalAssetCategory').className = \`ml-3 px-3 py-1 text-xs font-medium rounded-full \${categoryClass}\`;
+                    document.getElementById('modalAssetCategory').textContent = 
+                        holding.category === 'crypto' ? 'Criptomoneda' :
+                        holding.category === 'stocks' ? 'Acción' : 'ETF';
+                    
+                    // Render detailed content
+                    renderAssetDetailContent(holding, transactions, daily_snapshots);
+                    
+                } catch (error) {
+                    console.error('Error loading asset detail:', error);
+                    alert('Error cargando información del activo');
+                    closeAssetModal();
+                }
+            }
+
+            // Render asset detail content
+            function renderAssetDetailContent(holding, transactions, dailySnapshots) {
+                const modalContent = document.getElementById('modalContent');
+                
+                const pnlColor = holding.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600';
+                const pnlIcon = holding.unrealized_pnl >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+
+                const contentHTML = \`
+                    <!-- Asset Summary -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-blue-800 mb-2">Cantidad Total</h4>
+                            <p class="text-2xl font-bold text-blue-900">
+                                \${parseFloat(holding.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
+                            </p>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-600 mb-2">Precio Promedio</h4>
+                            <p class="text-2xl font-bold text-gray-800">
+                                $\${parseFloat(holding.avg_purchase_price).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </p>
+                        </div>
+                        
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-green-800 mb-2">Precio Actual</h4>
+                            <p class="text-2xl font-bold text-green-900">
+                                $\${parseFloat(holding.current_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Investment Summary -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-white border rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">Resumen de Inversión</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Invertido:</span>
+                                    <span class="font-medium">$\${parseFloat(holding.total_invested).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Valor Actual:</span>
+                                    <span class="font-medium">$\${parseFloat(holding.current_value).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                                </div>
+                                <hr>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Ganancia/Pérdida:</span>
+                                    <span class="font-bold \${pnlColor}">
+                                        <i class="fas \${pnlIcon} mr-1"></i>
+                                        $\${Math.abs(holding.unrealized_pnl).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                        (\${Math.abs(holding.pnl_percentage || 0).toFixed(2)}%)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border rounded-lg p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">Estadísticas</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Transacciones:</span>
+                                    <span class="font-medium">\${transactions.length}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Última Actualización:</span>
+                                    <span class="font-medium text-sm">
+                                        \${new Date(holding.price_updated_at || holding.last_updated).toLocaleString('es-ES')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transaction History -->
+                    <div class="mb-8">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-history mr-2"></i>
+                            Historial de Transacciones
+                        </h4>
+                        <div class="bg-white border rounded-lg overflow-hidden">
+                            \${transactions.length > 0 ? \`
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exchange</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        \${transactions.map(tx => \`
+                                            <tr>
+                                                <td class="px-6 py-4 text-sm text-gray-600">
+                                                    \${new Date(tx.transaction_date).toLocaleDateString('es-ES')}
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full \${
+                                                        tx.type === 'buy' ? 'bg-green-100 text-green-800' : 
+                                                        tx.type === 'sell' ? 'bg-red-100 text-red-800' : 
+                                                        tx.type === 'trade_in' ? 'bg-blue-100 text-blue-800' :
+                                                        'bg-purple-100 text-purple-800'
+                                                    }">
+                                                        \${tx.type === 'buy' ? '💰 Compra' : 
+                                                          tx.type === 'sell' ? '💵 Venta' : 
+                                                          tx.type === 'trade_in' ? '⬅️ Trade In' : 
+                                                          '➡️ Trade Out'}
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 text-sm text-gray-600">
+                                                    \${parseFloat(tx.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
+                                                </td>
+                                                <td class="px-6 py-4 text-sm text-gray-600">
+                                                    \${tx.price_per_unit > 0 ? '$' + parseFloat(tx.price_per_unit).toLocaleString('en-US', {minimumFractionDigits: 2}) : 'N/A'}
+                                                </td>
+                                                <td class="px-6 py-4 text-sm text-gray-600">
+                                                    \${tx.total_amount > 0 ? '$' + parseFloat(tx.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2}) : 'N/A'}
+                                                </td>
+                                                <td class="px-6 py-4 text-sm text-gray-600">\${tx.exchange}</td>
+                                            </tr>
+                                        \`).join('')}
+                                    </tbody>
+                                </table>
+                            \` : \`
+                                <div class="p-8 text-center text-gray-500">
+                                    No hay transacciones registradas para este activo
+                                </div>
+                            \`}
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-center space-x-4">
+                        <a href="/transactions" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>
+                            Nueva Transacción
+                        </a>
+                        <button onclick="closeAssetModal()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-times mr-2"></i>
+                            Cerrar
+                        </button>
+                    </div>
+                \`;
+
+                modalContent.innerHTML = contentHTML;
+            }
+
+            // Close asset detail modal
+            function closeAssetModal() {
+                document.getElementById('assetModal').classList.add('hidden');
+            }
+
+            // Show loading state
+            function showLoadingState() {
+                const container = document.getElementById('holdingsContainer');
+                container.innerHTML = \`
+                    <div class="col-span-full flex items-center justify-center py-12">
+                        <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mr-3"></i>
+                        <span class="text-gray-600 text-lg">Cargando activos...</span>
+                    </div>
+                \`;
+            }
+
+            // Show error state
+            function showErrorState() {
+                const container = document.getElementById('holdingsContainer');
+                container.innerHTML = \`
+                    <div class="col-span-full flex items-center justify-center py-12">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-3xl mr-3"></i>
+                        <span class="text-gray-600 text-lg">Error cargando activos</span>
+                    </div>
+                \`;
+            }
+
+            // Logout function
+            async function logout() {
+                try {
+                    await axios.post('/api/auth/logout');
+                    window.location.href = '/login';
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    window.location.href = '/login';
+                }
+            }
+        </script>
+
+        <style>
+            .category-filter {
+                @apply bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors;
+            }
+            
+            .category-filter.active {
+                @apply bg-blue-600 text-white hover:bg-blue-700;
+            }
+
+            .category-filter:hover {
+                @apply transform scale-105;
+            }
+
+            /* Modal overlay */
+            #assetModal {
+                backdrop-filter: blur(4px);
+            }
+        </style>
+    </body>
+    </html>
+  `)
 })
 
 app.get('/prices', (c) => {
