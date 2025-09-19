@@ -2248,14 +2248,52 @@ app.get('/asset/:symbol', (c) => {
                     </div>
                 </div>
 
+                <!-- Time Period Selector -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <div class="flex flex-wrap items-center justify-between">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 lg:mb-0">
+                            <i class="fas fa-clock mr-2 text-purple-600"></i>
+                            Período de Análisis
+                        </h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="changePeriod('1D')" id="period-1D" class="period-btn px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                1 Día
+                            </button>
+                            <button onclick="changePeriod('1W')" id="period-1W" class="period-btn px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                1 Semana
+                            </button>
+                            <button onclick="changePeriod('1M')" id="period-1M" class="period-btn active px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                1 Mes
+                            </button>
+                            <button onclick="changePeriod('3M')" id="period-3M" class="period-btn px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                3 Meses
+                            </button>
+                            <button onclick="changePeriod('6M')" id="period-6M" class="period-btn px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                6 Meses
+                            </button>
+                            <button onclick="changePeriod('1Y')" id="period-1Y" class="period-btn px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                1 Año
+                            </button>
+                            <button onclick="changePeriod('ALL')" id="period-ALL" class="period-btn px-3 py-2 text-sm font-medium rounded-lg border transition-colors">
+                                Todo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Charts Section -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                     <!-- Price vs Time Chart -->
                     <div class="bg-white rounded-xl shadow-sm p-6">
-                        <h3 class="text-lg font-bold text-gray-800 mb-4">
-                            <i class="fas fa-chart-line mr-2 text-blue-600"></i>
-                            Precio vs Tiempo
-                        </h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">
+                                <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                                Precio vs Tiempo
+                            </h3>
+                            <div class="text-sm text-gray-600">
+                                <span id="priceChartPeriod">Último mes</span>
+                            </div>
+                        </div>
                         <div class="relative" style="height: 400px;">
                             <canvas id="priceChart"></canvas>
                         </div>
@@ -2263,10 +2301,15 @@ app.get('/asset/:symbol', (c) => {
 
                     <!-- Value vs Time Chart -->
                     <div class="bg-white rounded-xl shadow-sm p-6">
-                        <h3 class="text-lg font-bold text-gray-800 mb-4">
-                            <i class="fas fa-chart-area mr-2 text-green-600"></i>
-                            Valor en USD vs Tiempo
-                        </h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">
+                                <i class="fas fa-chart-area mr-2 text-green-600"></i>
+                                Valor en USD vs Tiempo
+                            </h3>
+                            <div class="text-sm text-gray-600">
+                                <span id="valueChartPeriod">Último mes</span>
+                            </div>
+                        </div>
                         <div class="relative" style="height: 400px;">
                             <canvas id="valueChart"></canvas>
                         </div>
@@ -2337,6 +2380,8 @@ app.get('/asset/:symbol', (c) => {
             let assetData = null;
             let priceChart = null;
             let valueChart = null;
+            let currentPeriod = '1M';
+            let allSnapshots = [];
 
             // Initialize page
             document.addEventListener('DOMContentLoaded', function() {
@@ -2424,10 +2469,58 @@ app.get('/asset/:symbol', (c) => {
                     return;
                 }
 
+                // Store all snapshots for filtering
+                allSnapshots = daily_snapshots;
+                
+                // Create charts with initial period (1M)
+                updateChartsWithPeriod(currentPeriod);
+            }
+
+            // Update charts based on selected period
+            function updateChartsWithPeriod(period) {
+                const { holding } = assetData;
+                
+                if (!allSnapshots || allSnapshots.length === 0) {
+                    return;
+                }
+
+                // Filter data based on period
+                const filteredSnapshots = filterSnapshotsByPeriod(allSnapshots, period);
+                
+                if (filteredSnapshots.length === 0) {
+                    return;
+                }
+
                 // Process data for charts
-                const dates = daily_snapshots.map(s => s.snapshot_date);
-                const prices = daily_snapshots.map(s => parseFloat(s.price_per_unit));
-                const values = daily_snapshots.map(s => parseFloat(s.price_per_unit) * parseFloat(holding.quantity));
+                const dates = filteredSnapshots.map(s => s.snapshot_date);
+                const prices = filteredSnapshots.map(s => parseFloat(s.price_per_unit));
+                const values = filteredSnapshots.map(s => parseFloat(s.price_per_unit) * parseFloat(holding.quantity));
+
+                // Update period labels
+                const periodLabels = {
+                    '1D': 'Último día',
+                    '1W': 'Última semana',
+                    '1M': 'Último mes',
+                    '3M': 'Últimos 3 meses',
+                    '6M': 'Últimos 6 meses',
+                    '1Y': 'Último año',
+                    'ALL': 'Todo el período'
+                };
+                
+                document.getElementById('priceChartPeriod').textContent = periodLabels[period];
+                document.getElementById('valueChartPeriod').textContent = periodLabels[period];
+
+                // Destroy existing charts
+                if (priceChart) {
+                    priceChart.destroy();
+                }
+                if (valueChart) {
+                    valueChart.destroy();
+                }
+
+                // Get time unit for the period
+                const timeUnit = getTimeUnitForPeriod(period);
+                const displayFormat = getDisplayFormatForPeriod(period);
 
                 // Create price chart
                 const priceCtx = document.getElementById('priceChart').getContext('2d');
@@ -2442,20 +2535,24 @@ app.get('/asset/:symbol', (c) => {
                             backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             borderWidth: 2,
                             fill: true,
-                            tension: 0.1
+                            tension: 0.1,
+                            pointRadius: period === '1D' ? 3 : (period === '1W' ? 2 : 1),
+                            pointHoverRadius: 5
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
                         scales: {
                             x: {
                                 type: 'time',
                                 time: {
-                                    unit: 'day',
-                                    displayFormats: {
-                                        day: 'MMM dd'
-                                    }
+                                    unit: timeUnit,
+                                    displayFormats: displayFormat
                                 },
                                 title: {
                                     display: true,
@@ -2479,8 +2576,21 @@ app.get('/asset/:symbol', (c) => {
                                 callbacks: {
                                     label: function(context) {
                                         return \`Precio: $\${context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2})}\`;
+                                    },
+                                    title: function(context) {
+                                        const date = new Date(context[0].parsed.x);
+                                        return date.toLocaleDateString('es-ES', { 
+                                            year: 'numeric', 
+                                            month: 'short', 
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
                                     }
                                 }
+                            },
+                            legend: {
+                                display: false
                             }
                         }
                     }
@@ -2499,20 +2609,24 @@ app.get('/asset/:symbol', (c) => {
                             backgroundColor: 'rgba(16, 185, 129, 0.1)',
                             borderWidth: 2,
                             fill: true,
-                            tension: 0.1
+                            tension: 0.1,
+                            pointRadius: period === '1D' ? 3 : (period === '1W' ? 2 : 1),
+                            pointHoverRadius: 5
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
                         scales: {
                             x: {
                                 type: 'time',
                                 time: {
-                                    unit: 'day',
-                                    displayFormats: {
-                                        day: 'MMM dd'
-                                    }
+                                    unit: timeUnit,
+                                    displayFormats: displayFormat
                                 },
                                 title: {
                                     display: true,
@@ -2536,12 +2650,136 @@ app.get('/asset/:symbol', (c) => {
                                 callbacks: {
                                     label: function(context) {
                                         return \`Valor: $\${context.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2})}\`;
+                                    },
+                                    title: function(context) {
+                                        const date = new Date(context[0].parsed.x);
+                                        return date.toLocaleDateString('es-ES', { 
+                                            year: 'numeric', 
+                                            month: 'short', 
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
                                     }
                                 }
+                            },
+                            legend: {
+                                display: false
                             }
                         }
                     }
                 });
+            }
+
+            // Filter snapshots by time period
+            function filterSnapshotsByPeriod(snapshots, period) {
+                if (period === 'ALL') {
+                    return snapshots;
+                }
+
+                const now = new Date();
+                let startDate = new Date();
+
+                switch (period) {
+                    case '1D':
+                        startDate.setDate(now.getDate() - 1);
+                        break;
+                    case '1W':
+                        startDate.setDate(now.getDate() - 7);
+                        break;
+                    case '1M':
+                        startDate.setMonth(now.getMonth() - 1);
+                        break;
+                    case '3M':
+                        startDate.setMonth(now.getMonth() - 3);
+                        break;
+                    case '6M':
+                        startDate.setMonth(now.getMonth() - 6);
+                        break;
+                    case '1Y':
+                        startDate.setFullYear(now.getFullYear() - 1);
+                        break;
+                    default:
+                        return snapshots;
+                }
+
+                return snapshots.filter(snapshot => {
+                    const snapshotDate = new Date(snapshot.snapshot_date);
+                    return snapshotDate >= startDate;
+                });
+            }
+
+            // Get appropriate time unit for chart based on period
+            function getTimeUnitForPeriod(period) {
+                switch (period) {
+                    case '1D':
+                        return 'hour';
+                    case '1W':
+                        return 'day';
+                    case '1M':
+                        return 'day';
+                    case '3M':
+                        return 'week';
+                    case '6M':
+                        return 'week';
+                    case '1Y':
+                        return 'month';
+                    case 'ALL':
+                        return 'month';
+                    default:
+                        return 'day';
+                }
+            }
+
+            // Get display format for chart based on period
+            function getDisplayFormatForPeriod(period) {
+                switch (period) {
+                    case '1D':
+                        return {
+                            hour: 'HH:mm',
+                            day: 'MMM dd HH:mm'
+                        };
+                    case '1W':
+                        return {
+                            day: 'MMM dd',
+                            week: 'MMM dd'
+                        };
+                    case '1M':
+                        return {
+                            day: 'MMM dd',
+                            week: 'MMM dd'
+                        };
+                    case '3M':
+                    case '6M':
+                        return {
+                            week: 'MMM dd',
+                            month: 'MMM yyyy'
+                        };
+                    case '1Y':
+                    case 'ALL':
+                        return {
+                            month: 'MMM yyyy',
+                            year: 'yyyy'
+                        };
+                    default:
+                        return {
+                            day: 'MMM dd'
+                        };
+                }
+            }
+
+            // Change period and update charts
+            function changePeriod(period) {
+                currentPeriod = period;
+                
+                // Update button states
+                document.querySelectorAll('.period-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.getElementById(\`period-\${period}\`).classList.add('active');
+                
+                // Update charts
+                updateChartsWithPeriod(period);
             }
 
             // Display daily history table
