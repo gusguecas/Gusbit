@@ -50,16 +50,16 @@ app.get('/login', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asset Tracker - Login</title>
+        <title>GusBit - Login</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     </head>
     <body class="bg-gradient-to-br from-blue-900 to-purple-900 min-h-screen flex items-center justify-center">
         <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
             <div class="text-center mb-8">
-                <i class="fas fa-chart-line text-4xl text-blue-600 mb-4"></i>
-                <h1 class="text-3xl font-bold text-gray-800">Asset Tracker</h1>
-                <p class="text-gray-600 mt-2">Seguimiento de Inversiones</p>
+                <div class="text-4xl font-black text-blue-600 mb-4 bg-blue-100 rounded-lg p-4 inline-block">GB</div>
+                <h1 class="text-3xl font-bold text-gray-800">GusBit</h1>
+                <p class="text-gray-600 mt-2">Track Stocks, ETFs & Crypto</p>
             </div>
             
             <form id="loginForm" class="space-y-6">
@@ -173,7 +173,7 @@ app.get('/', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asset Tracker - Dashboard</title>
+        <title>GusBit - Dashboard</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -187,10 +187,13 @@ app.get('/', (c) => {
             <div class="max-w-7xl mx-auto px-6 py-6">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-8">
-                        <h1 class="text-2xl font-bold text-white">
-                            <i class="fas fa-chart-line mr-3"></i>
-                            Asset Tracker
-                        </h1>
+                        <div class="flex items-center space-x-4">
+                            <h1 class="text-2xl font-bold text-white flex items-center">
+                                <span class="text-3xl font-black mr-3 bg-white text-blue-600 px-2 py-1 rounded-lg">GB</span>
+                                GusBit
+                            </h1>
+                            <p class="text-white text-sm opacity-75 hidden lg:block">Track Stocks, ETFs & Crypto</p>
+                        </div>
                         <nav class="hidden md:flex space-x-2">
                             <a href="/" class="nav-link active">
                                 <i class="fas fa-tachometer-alt mr-2"></i>
@@ -980,7 +983,7 @@ app.get('/transactions', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asset Tracker - Transacciones</title>
+        <title>GusBit - Transacciones</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -993,7 +996,7 @@ app.get('/transactions', (c) => {
                     <div class="flex items-center space-x-8">
                         <h1 class="text-2xl font-bold text-blue-600">
                             <i class="fas fa-chart-line mr-2"></i>
-                            Asset Tracker
+                            GusBit
                         </h1>
                         <nav class="flex space-x-6">
                             <a href="/" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
@@ -2370,7 +2373,7 @@ app.get('/asset/:symbol', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asset Tracker - ${symbol}</title>
+        <title>GusBit - ${symbol}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -2386,7 +2389,7 @@ app.get('/asset/:symbol', (c) => {
                     <div class="flex items-center space-x-8">
                         <h1 class="text-2xl font-bold text-blue-600">
                             <i class="fas fa-chart-line mr-2"></i>
-                            Asset Tracker
+                            GusBit
                         </h1>
                         <nav class="flex space-x-6">
                             <a href="/" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
@@ -3225,7 +3228,7 @@ app.get('/wallet', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asset Tracker - Mi Wallet</title>
+        <title>GusBit - Mi Wallet</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -3237,10 +3240,13 @@ app.get('/wallet', (c) => {
             <div class="max-w-7xl mx-auto px-6 py-6">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-8">
-                        <h1 class="text-2xl font-bold text-white">
-                            <i class="fas fa-chart-line mr-3"></i>
-                            Asset Tracker
-                        </h1>
+                        <div class="flex items-center space-x-4">
+                            <h1 class="text-2xl font-bold text-white flex items-center">
+                                <span class="text-3xl font-black mr-3 bg-white text-blue-600 px-2 py-1 rounded-lg">GB</span>
+                                GusBit
+                            </h1>
+                            <p class="text-white text-sm opacity-75 hidden lg:block">Track Stocks, ETFs & Crypto</p>
+                        </div>
                         <nav class="hidden md:flex space-x-2">
                             <a href="/" class="nav-link">
                                 <i class="fas fa-tachometer-alt mr-2"></i>
@@ -3655,7 +3661,7 @@ app.get('/asset/:symbol', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Asset Tracker - ${symbol}</title>
+        <title>GusBit - ${symbol}</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -3671,7 +3677,7 @@ app.get('/asset/:symbol', (c) => {
                     <div class="flex items-center space-x-8">
                         <h1 class="text-2xl font-bold text-blue-600">
                             <i class="fas fa-chart-line mr-2"></i>
-                            Asset Tracker
+                            GusBit
                         </h1>
                         <nav class="flex space-x-6">
                             <a href="/" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
