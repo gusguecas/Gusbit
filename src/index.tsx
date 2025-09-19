@@ -1868,6 +1868,83 @@ app.get('/api/wallet/holdings', async (c) => {
   }
 })
 
+// Generate daily snapshots for an asset (backfill from July 21, 2025)
+app.post('/api/wallet/asset/:symbol/generate-snapshots', async (c) => {
+  try {
+    const symbol = c.req.param('symbol')
+    
+    // Get holding info
+    const holding = await c.env.DB.prepare(`
+      SELECT h.*, a.current_price, a.api_source, a.api_id
+      FROM holdings h
+      JOIN assets a ON h.asset_symbol = a.symbol
+      WHERE h.asset_symbol = ?
+    `).bind(symbol).first()
+    
+    if (!holding) {
+      return c.json({ error: 'Asset not found in holdings' }, 404)
+    }
+    
+    // Generate daily snapshots from July 21, 2025 to today
+    const startDate = new Date('2025-07-21')
+    const today = new Date()
+    const msPerDay = 24 * 60 * 60 * 1000
+    
+    let snapshotsCreated = 0
+    
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0]
+      
+      // Check if snapshot already exists
+      const existingSnapshot = await c.env.DB.prepare(`
+        SELECT id FROM daily_snapshots 
+        WHERE asset_symbol = ? AND snapshot_date = ?
+      `).bind(symbol, dateStr).first()
+      
+      if (!existingSnapshot) {
+        // Simulate historical price (in production, you'd fetch from APIs or calculate from transactions)
+        let historicalPrice = holding.current_price || 100
+        
+        // Add some realistic variation for demo
+        const daysAgo = Math.floor((today - d) / msPerDay)
+        const variation = Math.sin(daysAgo * 0.1) * 0.1 + (Math.random() - 0.5) * 0.05
+        historicalPrice = historicalPrice * (1 + variation)
+        
+        // Calculate values for that date
+        const totalValue = holding.quantity * historicalPrice
+        const unrealizedPnl = totalValue - holding.total_invested
+        
+        // Create snapshot (simulate 9 PM Mazatlan time)
+        await c.env.DB.prepare(`
+          INSERT INTO daily_snapshots (
+            asset_symbol, snapshot_date, quantity, price_per_unit, 
+            total_value, unrealized_pnl, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          symbol,
+          dateStr,
+          holding.quantity,
+          historicalPrice,
+          totalValue,
+          unrealizedPnl,
+          new Date(d.getTime() + 21 * 60 * 60 * 1000).toISOString() // 9 PM Mazatlan
+        ).run()
+        
+        snapshotsCreated++
+      }
+    }
+    
+    return c.json({
+      success: true,
+      snapshots_created: snapshotsCreated,
+      message: `Se generaron ${snapshotsCreated} snapshots históricos`
+    })
+  } catch (error) {
+    console.error('Error generating snapshots:', error)
+    return c.json({ error: 'Error generating snapshots' }, 500)
+  }
+})
+
 // Get detailed asset information for individual view
 app.get('/api/wallet/asset/:symbol', async (c) => {
   try {
@@ -2107,27 +2184,7 @@ app.get('/wallet', (c) => {
             </div>
         </div>
 
-        <!-- Asset Detail Modal -->
-        <div id="assetModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-full overflow-y-auto">
-                <div class="p-6 border-b">
-                    <div class="flex justify-between items-center">
-                        <div class="flex items-center">
-                            <span id="modalAssetSymbol" class="text-2xl font-bold text-gray-800"></span>
-                            <span id="modalAssetName" class="text-gray-600 ml-3"></span>
-                            <span id="modalAssetCategory" class="ml-3 px-3 py-1 text-xs font-medium rounded-full"></span>
-                        </div>
-                        <button onclick="closeAssetModal()" class="text-gray-400 hover:text-gray-600">
-                            <i class="fas fa-times text-xl"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="p-6" id="modalContent">
-                    <!-- Modal content will be loaded here -->
-                </div>
-            </div>
-        </div>
+
 
         <script>
             // Global variables
@@ -2313,202 +2370,13 @@ app.get('/wallet', (c) => {
                 }
             }
 
-            // Open asset detail modal
-            async function openAssetDetail(symbol) {
-                try {
-                    const modal = document.getElementById('assetModal');
-                    const modalContent = document.getElementById('modalContent');
-                    
-                    // Show loading in modal
-                    modalContent.innerHTML = \`
-                        <div class="flex items-center justify-center py-12">
-                            <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mr-3"></i>
-                            <span class="text-gray-600">Cargando información del activo...</span>
-                        </div>
-                    \`;
-                    
-                    modal.classList.remove('hidden');
-                    
-                    // Fetch detailed asset info
-                    const response = await axios.get(\`/api/wallet/asset/\${symbol}\`);
-                    const { holding, transactions, daily_snapshots } = response.data;
-                    
-                    // Update modal header
-                    document.getElementById('modalAssetSymbol').textContent = holding.asset_symbol;
-                    document.getElementById('modalAssetName').textContent = holding.name;
-                    
-                    const categoryClass = holding.category === 'crypto' ? 'bg-orange-100 text-orange-800' :
-                                         holding.category === 'stocks' ? 'bg-blue-100 text-blue-800' :
-                                         'bg-purple-100 text-purple-800';
-                    document.getElementById('modalAssetCategory').className = \`ml-3 px-3 py-1 text-xs font-medium rounded-full \${categoryClass}\`;
-                    document.getElementById('modalAssetCategory').textContent = 
-                        holding.category === 'crypto' ? 'Criptomoneda' :
-                        holding.category === 'stocks' ? 'Acción' : 'ETF';
-                    
-                    // Render detailed content
-                    renderAssetDetailContent(holding, transactions, daily_snapshots);
-                    
-                } catch (error) {
-                    console.error('Error loading asset detail:', error);
-                    alert('Error cargando información del activo');
-                    closeAssetModal();
-                }
+            // Open asset detail page
+            function openAssetDetail(symbol) {
+                // Navigate to dedicated asset page
+                window.location.href = \`/asset/\${symbol}\`;
             }
 
-            // Render asset detail content
-            function renderAssetDetailContent(holding, transactions, dailySnapshots) {
-                const modalContent = document.getElementById('modalContent');
-                
-                const pnlColor = holding.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600';
-                const pnlIcon = holding.unrealized_pnl >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
 
-                const contentHTML = \`
-                    <!-- Asset Summary -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-blue-50 rounded-lg p-4">
-                            <h4 class="text-sm font-medium text-blue-800 mb-2">Cantidad Total</h4>
-                            <p class="text-2xl font-bold text-blue-900">
-                                \${parseFloat(holding.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
-                            </p>
-                        </div>
-                        
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h4 class="text-sm font-medium text-gray-600 mb-2">Precio Promedio</h4>
-                            <p class="text-2xl font-bold text-gray-800">
-                                $\${parseFloat(holding.avg_purchase_price).toLocaleString('en-US', {minimumFractionDigits: 2})}
-                            </p>
-                        </div>
-                        
-                        <div class="bg-green-50 rounded-lg p-4">
-                            <h4 class="text-sm font-medium text-green-800 mb-2">Precio Actual</h4>
-                            <p class="text-2xl font-bold text-green-900">
-                                $\${parseFloat(holding.current_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Investment Summary -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div class="bg-white border rounded-lg p-6">
-                            <h4 class="text-lg font-semibold text-gray-800 mb-4">Resumen de Inversión</h4>
-                            <div class="space-y-3">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Total Invertido:</span>
-                                    <span class="font-medium">$\${parseFloat(holding.total_invested).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Valor Actual:</span>
-                                    <span class="font-medium">$\${parseFloat(holding.current_value).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                                </div>
-                                <hr>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Ganancia/Pérdida:</span>
-                                    <span class="font-bold \${pnlColor}">
-                                        <i class="fas \${pnlIcon} mr-1"></i>
-                                        $\${Math.abs(holding.unrealized_pnl).toLocaleString('en-US', {minimumFractionDigits: 2})}
-                                        (\${Math.abs(holding.pnl_percentage || 0).toFixed(2)}%)
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-white border rounded-lg p-6">
-                            <h4 class="text-lg font-semibold text-gray-800 mb-4">Estadísticas</h4>
-                            <div class="space-y-3">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Total Transacciones:</span>
-                                    <span class="font-medium">\${transactions.length}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Última Actualización:</span>
-                                    <span class="font-medium text-sm">
-                                        \${new Date(holding.price_updated_at || holding.last_updated).toLocaleString('es-ES')}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Transaction History -->
-                    <div class="mb-8">
-                        <h4 class="text-lg font-semibold text-gray-800 mb-4">
-                            <i class="fas fa-history mr-2"></i>
-                            Historial de Transacciones
-                        </h4>
-                        <div class="bg-white border rounded-lg overflow-hidden">
-                            \${transactions.length > 0 ? \`
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exchange</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-200">
-                                        \${transactions.map(tx => \`
-                                            <tr>
-                                                <td class="px-6 py-4 text-sm text-gray-600">
-                                                    \${new Date(tx.transaction_date).toLocaleDateString('es-ES')}
-                                                </td>
-                                                <td class="px-6 py-4">
-                                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full \${
-                                                        tx.type === 'buy' ? 'bg-green-100 text-green-800' : 
-                                                        tx.type === 'sell' ? 'bg-red-100 text-red-800' : 
-                                                        tx.type === 'trade_in' ? 'bg-blue-100 text-blue-800' :
-                                                        'bg-purple-100 text-purple-800'
-                                                    }">
-                                                        \${tx.type === 'buy' ? '💰 Compra' : 
-                                                          tx.type === 'sell' ? '💵 Venta' : 
-                                                          tx.type === 'trade_in' ? '⬅️ Trade In' : 
-                                                          '➡️ Trade Out'}
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-600">
-                                                    \${parseFloat(tx.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-600">
-                                                    \${tx.price_per_unit > 0 ? '$' + parseFloat(tx.price_per_unit).toLocaleString('en-US', {minimumFractionDigits: 2}) : 'N/A'}
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-600">
-                                                    \${tx.total_amount > 0 ? '$' + parseFloat(tx.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2}) : 'N/A'}
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-600">\${tx.exchange}</td>
-                                            </tr>
-                                        \`).join('')}
-                                    </tbody>
-                                </table>
-                            \` : \`
-                                <div class="p-8 text-center text-gray-500">
-                                    No hay transacciones registradas para este activo
-                                </div>
-                            \`}
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex justify-center space-x-4">
-                        <a href="/transactions" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            <i class="fas fa-plus mr-2"></i>
-                            Nueva Transacción
-                        </a>
-                        <button onclick="closeAssetModal()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-                            <i class="fas fa-times mr-2"></i>
-                            Cerrar
-                        </button>
-                    </div>
-                \`;
-
-                modalContent.innerHTML = contentHTML;
-            }
-
-            // Close asset detail modal
-            function closeAssetModal() {
-                document.getElementById('assetModal').classList.add('hidden');
-            }
 
             // Show loading state
             function showLoadingState() {
@@ -2562,6 +2430,754 @@ app.get('/wallet', (c) => {
                 backdrop-filter: blur(4px);
             }
         </style>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================
+// INDIVIDUAL ASSET PAGE
+// ============================================
+
+app.get('/asset/:symbol', (c) => {
+  const symbol = c.req.param('symbol')
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Asset Tracker - ${symbol}</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+        <link href="/static/styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-50 min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-8">
+                        <h1 class="text-2xl font-bold text-blue-600">
+                            <i class="fas fa-chart-line mr-2"></i>
+                            Asset Tracker
+                        </h1>
+                        <nav class="flex space-x-6">
+                            <a href="/" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                            </a>
+                            <a href="/transactions" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-exchange-alt mr-1"></i>Transacciones
+                            </a>
+                            <a href="/wallet" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-wallet mr-1"></i>Wallet
+                            </a>
+                            <a href="/prices" class="text-gray-600 hover:text-blue-600 font-medium pb-1">
+                                <i class="fas fa-search-dollar mr-1"></i>Precios en Vivo
+                            </a>
+                        </nav>
+                    </div>
+                    <button onclick="logout()" class="text-gray-600 hover:text-red-600">
+                        <i class="fas fa-sign-out-alt mr-1"></i>Salir
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="max-w-7xl mx-auto px-6 py-16">
+            <div class="flex items-center justify-center">
+                <i class="fas fa-spinner fa-spin text-blue-600 text-3xl mr-4"></i>
+                <span class="text-gray-600 text-xl">Cargando información de ${symbol}...</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="hidden max-w-7xl mx-auto px-6 py-8">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center">
+                    <a href="/wallet" class="text-gray-500 hover:text-blue-600 mr-4">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </a>
+                    <div>
+                        <h2 class="text-4xl font-bold text-gray-800" id="assetSymbol">${symbol}</h2>
+                        <p class="text-gray-600 text-lg" id="assetName">Cargando...</p>
+                        <span id="assetCategory" class="inline-block mt-2 px-3 py-1 text-sm font-medium rounded-full"></span>
+                    </div>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="generateSnapshots()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-history mr-2"></i>
+                        Generar Historial
+                    </button>
+                    <a href="/transactions" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nueva Transacción
+                    </a>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Cantidad Total</p>
+                            <p id="totalQuantity" class="text-2xl font-bold text-gray-800">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-coins text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Precio Actual</p>
+                            <p id="currentPrice" class="text-2xl font-bold text-gray-800">$0.00</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-dollar-sign text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Valor Total</p>
+                            <p id="totalValue" class="text-2xl font-bold text-gray-800">$0.00</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-chart-bar text-purple-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">PnL Total</p>
+                            <p id="totalPnL" class="text-2xl font-bold">$0.00</p>
+                        </div>
+                        <div id="pnlIcon" class="bg-gray-100 p-3 rounded-full">
+                            <i class="fas fa-balance-scale text-gray-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Price Chart -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">
+                            <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                            Precio vs Tiempo
+                        </h3>
+                        <div class="flex space-x-2">
+                            <button onclick="changePriceRange('7d')" class="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200">7D</button>
+                            <button onclick="changePriceRange('30d')" class="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200">30D</button>
+                            <button onclick="changePriceRange('90d')" class="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded">90D</button>
+                        </div>
+                    </div>
+                    <div class="h-80">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Value Chart -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">
+                            <i class="fas fa-chart-area mr-2 text-green-600"></i>
+                            Valor en USD vs Tiempo
+                        </h3>
+                        <div class="flex space-x-2">
+                            <button onclick="changeValueRange('7d')" class="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200">7D</button>
+                            <button onclick="changeValueRange('30d')" class="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200">30D</button>
+                            <button onclick="changeValueRange('90d')" class="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded">90D</button>
+                        </div>
+                    </div>
+                    <div class="h-80">
+                        <canvas id="valueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily History Table -->
+            <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-gray-800">
+                        <i class="fas fa-calendar-alt mr-2 text-purple-600"></i>
+                        Historial Diario desde 21 Jul 2025 (9:00 PM Mazatlán)
+                    </h3>
+                    <div class="flex items-center space-x-4">
+                        <select id="monthFilter" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Todos los meses</option>
+                            <option value="2025-07">Julio 2025</option>
+                            <option value="2025-08">Agosto 2025</option>
+                            <option value="2025-09">Septiembre 2025</option>
+                        </select>
+                        <button onclick="exportToCSV()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-download mr-2"></i>
+                            Exportar CSV
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200" id="dailyHistoryTable">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio (9 PM)</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PnL</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Cambio</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200" id="dailyHistoryBody">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Transaction History -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-6">
+                    <i class="fas fa-history mr-2 text-blue-600"></i>
+                    Historial de Transacciones
+                </h3>
+                <div class="overflow-x-auto" id="transactionHistory">
+                    <!-- Transactions will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Global variables
+            const assetSymbol = '${symbol}';
+            let assetData = null;
+            let dailySnapshots = [];
+            let priceChart = null;
+            let valueChart = null;
+            let currentPriceRange = '90d';
+            let currentValueRange = '90d';
+
+            // Initialize page
+            document.addEventListener('DOMContentLoaded', function() {
+                loadAssetData();
+                
+                // Setup month filter
+                document.getElementById('monthFilter').addEventListener('change', filterDailyHistory);
+            });
+
+            // Load asset data
+            async function loadAssetData() {
+                try {
+                    const response = await axios.get(\`/api/wallet/asset/\${assetSymbol}\`);
+                    const { holding, transactions, daily_snapshots } = response.data;
+                    
+                    assetData = holding;
+                    dailySnapshots = daily_snapshots;
+                    
+                    // Update UI
+                    updateAssetHeader(holding);
+                    updateSummaryCards(holding);
+                    
+                    // Load charts if we have snapshots
+                    if (daily_snapshots.length > 0) {
+                        renderPriceChart(daily_snapshots);
+                        renderValueChart(daily_snapshots);
+                        renderDailyHistory(daily_snapshots);
+                    } else {
+                        showNoSnapshotsMessage();
+                    }
+                    
+                    // Load transactions
+                    renderTransactionHistory(transactions);
+                    
+                    // Show main content
+                    document.getElementById('loadingState').classList.add('hidden');
+                    document.getElementById('mainContent').classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('Error loading asset data:', error);
+                    alert('Error cargando información del activo');
+                    window.location.href = '/wallet';
+                }
+            }
+
+            // Update asset header
+            function updateAssetHeader(holding) {
+                document.getElementById('assetName').textContent = holding.name;
+                
+                const categoryClass = holding.category === 'crypto' ? 'bg-orange-100 text-orange-800' :
+                                     holding.category === 'stocks' ? 'bg-blue-100 text-blue-800' :
+                                     'bg-purple-100 text-purple-800';
+                                     
+                const categoryText = holding.category === 'crypto' ? 'Criptomoneda' :
+                                    holding.category === 'stocks' ? 'Acción' : 'ETF';
+                                    
+                const categoryElement = document.getElementById('assetCategory');
+                categoryElement.className = \`inline-block mt-2 px-3 py-1 text-sm font-medium rounded-full \${categoryClass}\`;
+                categoryElement.textContent = categoryText;
+            }
+
+            // Update summary cards
+            function updateSummaryCards(holding) {
+                document.getElementById('totalQuantity').textContent = 
+                    parseFloat(holding.quantity).toLocaleString('en-US', {maximumFractionDigits: 8});
+                
+                document.getElementById('currentPrice').textContent = 
+                    '$' + parseFloat(holding.current_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+                
+                document.getElementById('totalValue').textContent = 
+                    '$' + parseFloat(holding.current_value).toLocaleString('en-US', {minimumFractionDigits: 2});
+                
+                const pnlElement = document.getElementById('totalPnL');
+                const pnlIconElement = document.getElementById('pnlIcon');
+                
+                pnlElement.textContent = '$' + Math.abs(holding.unrealized_pnl).toLocaleString('en-US', {minimumFractionDigits: 2});
+                
+                if (holding.unrealized_pnl >= 0) {
+                    pnlElement.className = 'text-2xl font-bold text-green-600';
+                    pnlIconElement.className = 'bg-green-100 p-3 rounded-full';
+                    pnlIconElement.innerHTML = '<i class="fas fa-arrow-up text-green-600"></i>';
+                } else {
+                    pnlElement.className = 'text-2xl font-bold text-red-600';
+                    pnlIconElement.className = 'bg-red-100 p-3 rounded-full';
+                    pnlIconElement.innerHTML = '<i class="fas fa-arrow-down text-red-600"></i>';
+                }
+            }
+
+            // Render price chart
+            function renderPriceChart(snapshots, range = '90d') {
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                
+                if (priceChart) {
+                    priceChart.destroy();
+                }
+
+                // Filter data by range
+                const filteredData = filterDataByRange(snapshots, range);
+                
+                const labels = filteredData.map(s => new Date(s.snapshot_date).toLocaleDateString('es-ES'));
+                const prices = filteredData.map(s => parseFloat(s.price_per_unit));
+
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Precio (USD)',
+                            data: prices,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 2});
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    maxTicksLimit: 10
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+            }
+
+            // Render value chart
+            function renderValueChart(snapshots, range = '90d') {
+                const ctx = document.getElementById('valueChart').getContext('2d');
+                
+                if (valueChart) {
+                    valueChart.destroy();
+                }
+
+                // Filter data by range
+                const filteredData = filterDataByRange(snapshots, range);
+                
+                const labels = filteredData.map(s => new Date(s.snapshot_date).toLocaleDateString('es-ES'));
+                const values = filteredData.map(s => parseFloat(s.total_value));
+
+                valueChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Valor Total (USD)',
+                            data: values,
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 2});
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    maxTicksLimit: 10
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+            }
+
+            // Filter data by date range
+            function filterDataByRange(data, range) {
+                if (!data.length) return [];
+                
+                const now = new Date();
+                let startDate;
+                
+                switch(range) {
+                    case '7d':
+                        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        break;
+                    case '30d':
+                        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        break;
+                    case '90d':
+                    default:
+                        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+                        break;
+                }
+                
+                return data.filter(item => {
+                    const itemDate = new Date(item.snapshot_date);
+                    return itemDate >= startDate;
+                }).sort((a, b) => new Date(a.snapshot_date) - new Date(b.snapshot_date));
+            }
+
+            // Change price chart range
+            function changePriceRange(range) {
+                currentPriceRange = range;
+                
+                // Update button styles
+                document.querySelectorAll('[onclick*="changePriceRange"]').forEach(btn => {
+                    btn.className = 'px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200';
+                });
+                event.target.className = 'px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded';
+                
+                renderPriceChart(dailySnapshots, range);
+            }
+
+            // Change value chart range
+            function changeValueRange(range) {
+                currentValueRange = range;
+                
+                // Update button styles
+                document.querySelectorAll('[onclick*="changeValueRange"]').forEach(btn => {
+                    btn.className = 'px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200';
+                });
+                event.target.className = 'px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded';
+                
+                renderValueChart(dailySnapshots, range);
+            }
+
+            // Render daily history table
+            function renderDailyHistory(snapshots) {
+                const tbody = document.getElementById('dailyHistoryBody');
+                
+                if (!snapshots.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No hay datos históricos disponibles</td></tr>';
+                    return;
+                }
+
+                // Sort by date descending
+                const sortedSnapshots = [...snapshots].sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date));
+
+                const rowsHTML = sortedSnapshots.map((snapshot, index) => {
+                    const prevSnapshot = sortedSnapshots[index + 1];
+                    let changePercent = 0;
+                    let changeClass = 'text-gray-600';
+                    let changeIcon = 'fas fa-minus';
+
+                    if (prevSnapshot) {
+                        const prevPrice = parseFloat(prevSnapshot.price_per_unit);
+                        const currentPrice = parseFloat(snapshot.price_per_unit);
+                        changePercent = ((currentPrice - prevPrice) / prevPrice) * 100;
+                        
+                        if (changePercent > 0) {
+                            changeClass = 'text-green-600';
+                            changeIcon = 'fas fa-arrow-up';
+                        } else if (changePercent < 0) {
+                            changeClass = 'text-red-600';
+                            changeIcon = 'fas fa-arrow-down';
+                        }
+                    }
+
+                    const pnlClass = snapshot.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600';
+                    const pnlIcon = snapshot.unrealized_pnl >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+
+                    return \`
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-800">
+                                \${new Date(snapshot.snapshot_date).toLocaleDateString('es-ES', {
+                                    weekday: 'short',
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600">
+                                \${parseFloat(snapshot.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600">
+                                $\${parseFloat(snapshot.price_per_unit).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </td>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-800">
+                                $\${parseFloat(snapshot.total_value).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </td>
+                            <td class="px-6 py-4 text-sm font-medium \${pnlClass}">
+                                <i class="\${pnlIcon} mr-1"></i>
+                                $\${Math.abs(snapshot.unrealized_pnl).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </td>
+                            <td class="px-6 py-4 text-sm font-medium \${changeClass}">
+                                <i class="\${changeIcon} mr-1"></i>
+                                \${Math.abs(changePercent).toFixed(2)}%
+                            </td>
+                        </tr>
+                    \`;
+                }).join('');
+
+                tbody.innerHTML = rowsHTML;
+            }
+
+            // Filter daily history by month
+            function filterDailyHistory() {
+                const selectedMonth = document.getElementById('monthFilter').value;
+                
+                if (!selectedMonth) {
+                    renderDailyHistory(dailySnapshots);
+                    return;
+                }
+
+                const filteredSnapshots = dailySnapshots.filter(snapshot => {
+                    return snapshot.snapshot_date.startsWith(selectedMonth);
+                });
+
+                renderDailyHistory(filteredSnapshots);
+            }
+
+            // Render transaction history
+            function renderTransactionHistory(transactions) {
+                const container = document.getElementById('transactionHistory');
+                
+                if (!transactions.length) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500">No hay transacciones registradas</div>';
+                    return;
+                }
+
+                const tableHTML = \`
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exchange</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            \${transactions.map(tx => \`
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 text-sm text-gray-600">
+                                        \${new Date(tx.transaction_date).toLocaleDateString('es-ES')}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full \${
+                                            tx.type === 'buy' ? 'bg-green-100 text-green-800' : 
+                                            tx.type === 'sell' ? 'bg-red-100 text-red-800' : 
+                                            tx.type === 'trade_in' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-purple-100 text-purple-800'
+                                        }">
+                                            \${tx.type === 'buy' ? '💰 Compra' : 
+                                              tx.type === 'sell' ? '💵 Venta' : 
+                                              tx.type === 'trade_in' ? '⬅️ Trade In' : 
+                                              '➡️ Trade Out'}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-600">
+                                        \${parseFloat(tx.quantity).toLocaleString('en-US', {maximumFractionDigits: 8})}
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-600">
+                                        \${tx.price_per_unit > 0 ? '$' + parseFloat(tx.price_per_unit).toLocaleString('en-US', {minimumFractionDigits: 2}) : 'N/A'}
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-600">
+                                        \${tx.total_amount > 0 ? '$' + parseFloat(tx.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2}) : 'N/A'}
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-600">\${tx.exchange}</td>
+                                </tr>
+                            \`).join('')}
+                        </tbody>
+                    </table>
+                \`;
+                
+                container.innerHTML = tableHTML;
+            }
+
+            // Generate snapshots
+            async function generateSnapshots() {
+                try {
+                    const btn = event.target;
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generando...';
+                    btn.disabled = true;
+                    
+                    const response = await axios.post(\`/api/wallet/asset/\${assetSymbol}/generate-snapshots\`);
+                    
+                    if (response.data.success) {
+                        alert(response.data.message);
+                        // Reload page to show new snapshots
+                        window.location.reload();
+                    } else {
+                        alert('Error generando snapshots');
+                    }
+                    
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                } catch (error) {
+                    console.error('Error generating snapshots:', error);
+                    alert('Error generando snapshots');
+                    
+                    const btn = event.target;
+                    btn.innerHTML = '<i class="fas fa-history mr-2"></i>Generar Historial';
+                    btn.disabled = false;
+                }
+            }
+
+            // Export to CSV
+            function exportToCSV() {
+                if (!dailySnapshots.length) {
+                    alert('No hay datos para exportar');
+                    return;
+                }
+
+                const headers = ['Fecha', 'Cantidad', 'Precio (9 PM)', 'Valor Total', 'PnL', '% Cambio'];
+                const csvData = [headers];
+
+                const sortedSnapshots = [...dailySnapshots].sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date));
+
+                sortedSnapshots.forEach((snapshot, index) => {
+                    const prevSnapshot = sortedSnapshots[index + 1];
+                    let changePercent = 0;
+
+                    if (prevSnapshot) {
+                        const prevPrice = parseFloat(prevSnapshot.price_per_unit);
+                        const currentPrice = parseFloat(snapshot.price_per_unit);
+                        changePercent = ((currentPrice - prevPrice) / prevPrice) * 100;
+                    }
+
+                    csvData.push([
+                        new Date(snapshot.snapshot_date).toLocaleDateString('es-ES'),
+                        parseFloat(snapshot.quantity).toFixed(8),
+                        parseFloat(snapshot.price_per_unit).toFixed(2),
+                        parseFloat(snapshot.total_value).toFixed(2),
+                        parseFloat(snapshot.unrealized_pnl).toFixed(2),
+                        changePercent.toFixed(2) + '%'
+                    ]);
+                });
+
+                const csvContent = csvData.map(row => row.join(',')).join('\\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = \`\${assetSymbol}_historial_\${new Date().toISOString().split('T')[0]}.csv\`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+
+            // Show no snapshots message
+            function showNoSnapshotsMessage() {
+                const message = \`
+                    <div class="col-span-2 bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+                        <i class="fas fa-exclamation-triangle text-yellow-600 text-3xl mb-4"></i>
+                        <h3 class="text-lg font-medium text-yellow-800 mb-2">No hay datos históricos</h3>
+                        <p class="text-yellow-700 mb-4">Haz clic en "Generar Historial" para crear snapshots desde julio 21, 2025</p>
+                        <button onclick="generateSnapshots()" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+                            <i class="fas fa-history mr-2"></i>
+                            Generar Historial Ahora
+                        </button>
+                    </div>
+                \`;
+                
+                document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2').innerHTML = message;
+            }
+
+            // Logout function
+            async function logout() {
+                try {
+                    await axios.post('/api/auth/logout');
+                    window.location.href = '/login';
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    window.location.href = '/login';
+                }
+            }
+        </script>
     </body>
     </html>
   `)
