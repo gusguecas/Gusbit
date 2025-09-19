@@ -2491,10 +2491,18 @@ app.get('/asset/:symbol', (c) => {
                     return;
                 }
 
+                // Calculate historical quantities for accurate value chart
+                const { transactions } = assetData;
+                const historicalQuantities = calculateHistoricalQuantities(transactions, filteredSnapshots);
+
                 // Process data for charts
                 const dates = filteredSnapshots.map(s => s.snapshot_date);
                 const prices = filteredSnapshots.map(s => parseFloat(s.price_per_unit));
-                const values = filteredSnapshots.map(s => parseFloat(s.price_per_unit) * parseFloat(holding.quantity));
+                const values = filteredSnapshots.map(s => {
+                    const price = parseFloat(s.price_per_unit);
+                    const quantity = historicalQuantities[s.snapshot_date] || 0;
+                    return price * quantity;
+                });
 
                 // Update period labels
                 const periodLabels = {
@@ -2792,12 +2800,18 @@ app.get('/asset/:symbol', (c) => {
                     return;
                 }
 
+                // Calculate historical quantity for each date based on transactions
+                const { transactions } = assetData;
+                const historicalQuantities = calculateHistoricalQuantities(transactions, daily_snapshots);
+
                 const rows = daily_snapshots.map((snapshot, index) => {
                     const date = new Date(snapshot.snapshot_date);
                     const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' });
                     const formattedDate = date.toLocaleDateString('es-ES');
                     const price = parseFloat(snapshot.price_per_unit);
-                    const quantity = parseFloat(holding.quantity);
+                    
+                    // Use historical quantity for that specific date
+                    const quantity = historicalQuantities[snapshot.snapshot_date] || 0;
                     const totalValue = price * quantity;
                     
                     // Calculate daily change
@@ -2880,6 +2894,45 @@ app.get('/asset/:symbol', (c) => {
                 \`).join('');
 
                 tableBody.innerHTML = rows;
+            }
+
+            // Calculate historical quantities for each date
+            function calculateHistoricalQuantities(transactions, snapshots) {
+                const quantities = {};
+                
+                // Sort transactions by date
+                const sortedTransactions = [...transactions].sort((a, b) => 
+                    new Date(a.transaction_date) - new Date(b.transaction_date)
+                );
+                
+                // For each snapshot date, calculate quantity up to that date
+                snapshots.forEach(snapshot => {
+                    const snapshotDate = new Date(snapshot.snapshot_date);
+                    let totalQuantity = 0;
+                    
+                    // Sum all transactions up to this date
+                    sortedTransactions.forEach(tx => {
+                        const txDate = new Date(tx.transaction_date);
+                        
+                        // Only include transactions up to the snapshot date
+                        if (txDate <= snapshotDate) {
+                            switch (tx.type) {
+                                case 'buy':
+                                case 'trade_in':
+                                    totalQuantity += parseFloat(tx.quantity);
+                                    break;
+                                case 'sell':
+                                case 'trade_out':
+                                    totalQuantity -= parseFloat(tx.quantity);
+                                    break;
+                            }
+                        }
+                    });
+                    
+                    quantities[snapshot.snapshot_date] = Math.max(0, totalQuantity);
+                });
+                
+                return quantities;
             }
 
             // Update asset price
