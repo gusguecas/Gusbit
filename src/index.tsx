@@ -651,6 +651,102 @@ app.get('/api/transactions', async (c) => {
   }
 })
 
+// Create trade (two transactions at once)
+app.post('/api/transactions/trade', async (c) => {
+  try {
+    const {
+      asset_from,
+      asset_to, 
+      quantity_from,
+      quantity_to,
+      exchange,
+      fees,
+      notes,
+      transaction_date
+    } = await c.req.json()
+
+    // Validate required fields
+    if (!asset_from?.symbol || !asset_to?.symbol || !quantity_from || !quantity_to || !exchange) {
+      return c.json({ error: 'Missing required fields for trade' }, 400)
+    }
+
+    const tradeDate = transaction_date || new Date().toISOString()
+    const tradeFees = fees || 0
+    const tradeNotes = `TRADE: ${asset_from.symbol} → ${asset_to.symbol}. ${notes || ''}`
+
+    // Ensure both assets exist in database
+    for (const asset of [asset_from, asset_to]) {
+      let existingAsset = await c.env.DB.prepare('SELECT * FROM assets WHERE symbol = ?').bind(asset.symbol).first()
+      
+      if (!existingAsset) {
+        await c.env.DB.prepare(`
+          INSERT INTO assets (symbol, name, category, api_source, api_id, current_price, price_updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          asset.symbol,
+          asset.name || asset.symbol,
+          asset.category || 'stocks',
+          asset.api_source || 'manual',
+          asset.api_id || asset.symbol,
+          0, // Will be updated when prices are fetched
+          tradeDate
+        ).run()
+      }
+    }
+
+    // Create two transactions for the trade
+    // 1. Sell/Trade-out transaction (what you're giving up)
+    await c.env.DB.prepare(`
+      INSERT INTO transactions (
+        type, asset_symbol, exchange, quantity, price_per_unit, 
+        total_amount, fees, notes, transaction_date
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      'trade_out',
+      asset_from.symbol,
+      exchange,
+      quantity_from,
+      0, // Price per unit not applicable for trades
+      0, // Total amount not applicable for trades
+      tradeFees / 2, // Split fees between both transactions
+      tradeNotes,
+      tradeDate
+    ).run()
+
+    // 2. Buy/Trade-in transaction (what you're receiving)
+    await c.env.DB.prepare(`
+      INSERT INTO transactions (
+        type, asset_symbol, exchange, quantity, price_per_unit, 
+        total_amount, fees, notes, transaction_date
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      'trade_in',
+      asset_to.symbol,
+      exchange,
+      quantity_to,
+      0, // Price per unit not applicable for trades
+      0, // Total amount not applicable for trades
+      tradeFees / 2, // Split fees between both transactions
+      tradeNotes,
+      tradeDate
+    ).run()
+
+    // Update holdings for both assets
+    await updateHoldings(c.env.DB, asset_from.symbol)
+    await updateHoldings(c.env.DB, asset_to.symbol)
+
+    return c.json({ 
+      success: true, 
+      message: `Trade registrado: ${quantity_from} ${asset_from.symbol} → ${quantity_to} ${asset_to.symbol}`
+    })
+  } catch (error) {
+    console.error('Trade creation error:', error)
+    return c.json({ error: 'Error creating trade' }, 500)
+  }
+})
+
 // Create new transaction
 app.post('/api/transactions', async (c) => {
   try {
@@ -773,17 +869,37 @@ async function updateHoldings(db, assetSymbol) {
         SUM(CASE WHEN type IN ('buy', 'trade_in') THEN quantity ELSE 0 END) -
         SUM(CASE WHEN type IN ('sell', 'trade_out') THEN quantity ELSE 0 END) as net_quantity,
         
-        SUM(CASE WHEN type IN ('buy', 'trade_in') THEN total_amount + fees ELSE 0 END) -
-        SUM(CASE WHEN type IN ('sell', 'trade_out') THEN total_amount - fees ELSE 0 END) as net_invested
+        -- For trades, we don't count the total_amount since it's 0, instead we estimate based on current price
+        SUM(CASE 
+          WHEN type = 'buy' THEN total_amount + fees
+          WHEN type = 'sell' THEN -(total_amount - fees)
+          WHEN type IN ('trade_in', 'trade_out') THEN 0
+          ELSE 0 
+        END) as net_invested_fiat
       FROM transactions 
       WHERE asset_symbol = ?
     `).bind(assetSymbol).first()
 
     const netQuantity = stats?.net_quantity || 0
-    const netInvested = stats?.net_invested || 0
-    const avgPrice = netQuantity > 0 ? netInvested / netQuantity : 0
+    
+    // For assets acquired through trades, we need a different approach to calculate average price
+    let netInvested = stats?.net_invested_fiat || 0
+    let avgPrice = 0
 
-    // Get current price
+    if (netQuantity > 0) {
+      // If there were fiat transactions, use that for average price
+      if (netInvested > 0) {
+        avgPrice = netInvested / netQuantity
+      } else {
+        // If only trades, use current price as estimate (not ideal but better than 0)
+        const asset = await db.prepare('SELECT current_price FROM assets WHERE symbol = ?').bind(assetSymbol).first()
+        const currentPrice = asset?.current_price || 0
+        avgPrice = currentPrice
+        netInvested = netQuantity * currentPrice
+      }
+    }
+
+    // Get current price for market value calculation
     const asset = await db.prepare('SELECT current_price FROM assets WHERE symbol = ?').bind(assetSymbol).first()
     const currentPrice = asset?.current_price || 0
     const currentValue = netQuantity * currentPrice
@@ -878,10 +994,9 @@ app.get('/transactions', (c) => {
                         <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Transacción</label>
                         <select id="transactionType" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
                             <option value="">Seleccionar tipo</option>
-                            <option value="buy">Compra</option>
-                            <option value="sell">Venta</option>
-                            <option value="trade_in">Trade Entrada (Recibido)</option>
-                            <option value="trade_out">Trade Salida (Enviado)</option>
+                            <option value="buy">💰 Compra (Fiat → Activo)</option>
+                            <option value="sell">💵 Venta (Activo → Fiat)</option>
+                            <option value="trade">🔄 Trade (Activo ↔ Activo)</option>
                         </select>
                     </div>
 
@@ -901,8 +1016,8 @@ app.get('/transactions', (c) => {
                         </select>
                     </div>
 
-                    <!-- Asset Search -->
-                    <div class="lg:col-span-2">
+                    <!-- Asset Search (Buy/Sell) -->
+                    <div id="singleAssetSection" class="lg:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Buscar Activo</label>
                         <div class="relative">
                             <input 
@@ -934,8 +1049,115 @@ app.get('/transactions', (c) => {
                         </div>
                     </div>
 
-                    <!-- Cantidad -->
-                    <div>
+                    <!-- Trade Section (Hidden by default) -->
+                    <div id="tradeSection" class="lg:col-span-2 hidden">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <h3 class="text-lg font-medium text-blue-800 mb-3">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Intercambio entre Activos
+                            </h3>
+                            <p class="text-blue-700 text-sm">Registra el intercambio directo entre dos de tus activos (ej: BTC → ETH)</p>
+                        </div>
+
+                        <!-- Asset FROM (What you're selling) -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-arrow-right mr-1 text-red-500"></i>
+                                    Activo que VENDES
+                                </label>
+                                <div class="relative">
+                                    <input 
+                                        type="text" 
+                                        id="assetFromSearch" 
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent pr-10"
+                                        placeholder="Buscar activo a vender (ej: BTC)"
+                                        autocomplete="off"
+                                    >
+                                    <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                                    
+                                    <div id="searchResultsFrom" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    </div>
+                                </div>
+                                
+                                <div id="selectedAssetFrom" class="hidden mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <span class="font-medium text-red-800" id="selectedSymbolFrom"></span>
+                                            <span class="text-red-600 ml-2" id="selectedNameFrom"></span>
+                                        </div>
+                                        <button type="button" onclick="clearSelectedAssetFrom()" class="text-red-600 hover:text-red-800">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i class="fas fa-arrow-left mr-1 text-green-500"></i>
+                                    Activo que RECIBES
+                                </label>
+                                <div class="relative">
+                                    <input 
+                                        type="text" 
+                                        id="assetToSearch" 
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent pr-10"
+                                        placeholder="Buscar activo a recibir (ej: ETH)"
+                                        autocomplete="off"
+                                    >
+                                    <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                                    
+                                    <div id="searchResultsTo" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    </div>
+                                </div>
+                                
+                                <div id="selectedAssetTo" class="hidden mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <span class="font-medium text-green-800" id="selectedSymbolTo"></span>
+                                            <span class="text-green-600 ml-2" id="selectedNameTo"></span>
+                                        </div>
+                                        <button type="button" onclick="clearSelectedAssetTo()" class="text-green-600 hover:text-green-800">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Trade Quantities -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Cantidad que VENDES
+                                </label>
+                                <input 
+                                    type="number" 
+                                    id="quantityFrom" 
+                                    step="0.00000001" 
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    placeholder="0.00"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Cantidad que RECIBES
+                                </label>
+                                <input 
+                                    type="number" 
+                                    id="quantityTo" 
+                                    step="0.00000001" 
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    placeholder="0.00"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cantidad (Buy/Sell only) -->
+                    <div id="quantitySection">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad</label>
                         <input 
                             type="number" 
@@ -943,12 +1165,11 @@ app.get('/transactions', (c) => {
                             step="0.00000001" 
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="0.00"
-                            required
                         >
                     </div>
 
-                    <!-- Precio por Unidad -->
-                    <div>
+                    <!-- Precio por Unidad (Buy/Sell only) -->
+                    <div id="priceSection">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Precio por Unidad (USD)</label>
                         <div class="relative">
                             <span class="absolute left-3 top-2 text-gray-500">$</span>
@@ -958,7 +1179,6 @@ app.get('/transactions', (c) => {
                                 step="0.01" 
                                 class="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="0.00"
-                                required
                             >
                             <button type="button" onclick="fetchCurrentPrice()" class="absolute right-2 top-1 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
                                 <i class="fas fa-sync-alt mr-1"></i>Precio Actual
@@ -966,8 +1186,8 @@ app.get('/transactions', (c) => {
                         </div>
                     </div>
 
-                    <!-- Total Amount (Auto-calculated) -->
-                    <div>
+                    <!-- Total Amount (Auto-calculated, Buy/Sell only) -->
+                    <div id="totalSection">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Total</label>
                         <div class="relative">
                             <span class="absolute left-3 top-2 text-gray-500">$</span>
@@ -1061,7 +1281,10 @@ app.get('/transactions', (c) => {
         <script>
             // Global variables
             let selectedAssetData = null;
+            let selectedAssetFromData = null;
+            let selectedAssetToData = null;
             let searchTimeout = null;
+            let currentTransactionType = '';
 
             // Initialize page
             document.addEventListener('DOMContentLoaded', function() {
@@ -1079,8 +1302,15 @@ app.get('/transactions', (c) => {
 
             // Setup all event listeners
             function setupEventListeners() {
-                // Asset search
+                // Transaction type change
+                document.getElementById('transactionType').addEventListener('change', handleTransactionTypeChange);
+                
+                // Asset search (single asset for buy/sell)
                 document.getElementById('assetSearch').addEventListener('input', handleAssetSearch);
+                
+                // Asset search for trades
+                document.getElementById('assetFromSearch').addEventListener('input', (e) => handleTradeAssetSearch(e, 'from'));
+                document.getElementById('assetToSearch').addEventListener('input', (e) => handleTradeAssetSearch(e, 'to'));
                 
                 // Auto-calculate total
                 document.getElementById('quantity').addEventListener('input', calculateTotal);
@@ -1091,10 +1321,44 @@ app.get('/transactions', (c) => {
                 
                 // Click outside to close search results
                 document.addEventListener('click', function(e) {
-                    if (!e.target.closest('#assetSearch') && !e.target.closest('#searchResults')) {
-                        hideSearchResults();
+                    const searchElements = ['#assetSearch', '#searchResults', '#assetFromSearch', '#searchResultsFrom', '#assetToSearch', '#searchResultsTo'];
+                    if (!searchElements.some(selector => e.target.closest(selector))) {
+                        hideAllSearchResults();
                     }
                 });
+            }
+
+            // Handle transaction type change
+            function handleTransactionTypeChange(e) {
+                currentTransactionType = e.target.value;
+                
+                const singleAssetSection = document.getElementById('singleAssetSection');
+                const tradeSection = document.getElementById('tradeSection');
+                const quantitySection = document.getElementById('quantitySection');
+                const priceSection = document.getElementById('priceSection');
+                const totalSection = document.getElementById('totalSection');
+                
+                if (currentTransactionType === 'trade') {
+                    // Show trade interface
+                    singleAssetSection.classList.add('hidden');
+                    quantitySection.classList.add('hidden');
+                    priceSection.classList.add('hidden');
+                    totalSection.classList.add('hidden');
+                    tradeSection.classList.remove('hidden');
+                    
+                    // Clear single asset data
+                    clearSelectedAsset();
+                } else {
+                    // Show buy/sell interface
+                    singleAssetSection.classList.remove('hidden');
+                    quantitySection.classList.remove('hidden');
+                    priceSection.classList.remove('hidden');
+                    totalSection.classList.remove('hidden');
+                    tradeSection.classList.add('hidden');
+                    
+                    // Clear trade data
+                    clearTradeAssets();
+                }
             }
 
             // Handle asset search with debouncing
@@ -1108,27 +1372,43 @@ app.get('/transactions', (c) => {
                     return;
                 }
                 
-                searchTimeout = setTimeout(() => searchAssets(query), 300);
+                searchTimeout = setTimeout(() => searchAssets(query, 'single'), 300);
+            }
+
+            // Handle trade asset search
+            function handleTradeAssetSearch(e, type) {
+                const query = e.target.value.trim();
+                
+                clearTimeout(searchTimeout);
+                
+                if (query.length < 2) {
+                    hideTradeSearchResults(type);
+                    return;
+                }
+                
+                searchTimeout = setTimeout(() => searchAssets(query, type), 300);
             }
 
             // Search assets from API
-            async function searchAssets(query) {
+            async function searchAssets(query, type = 'single') {
                 try {
-                    showSearchLoading();
+                    showSearchLoading(type);
                     
                     const response = await axios.get(\`/api/assets/search?q=\${encodeURIComponent(query)}\`);
                     const { results } = response.data;
                     
-                    displaySearchResults(results);
+                    displaySearchResults(results, type);
                 } catch (error) {
                     console.error('Asset search error:', error);
-                    hideSearchResults();
+                    hideSearchResults(type);
                 }
             }
 
             // Display search results
-            function displaySearchResults(results) {
-                const resultsContainer = document.getElementById('searchResults');
+            function displaySearchResults(results, type = 'single') {
+                const containerId = type === 'single' ? 'searchResults' : 
+                                   type === 'from' ? 'searchResultsFrom' : 'searchResultsTo';
+                const resultsContainer = document.getElementById(containerId);
                 
                 if (results.length === 0) {
                     resultsContainer.innerHTML = '<div class="p-4 text-gray-500 text-center">No se encontraron activos</div>';
@@ -1136,9 +1416,12 @@ app.get('/transactions', (c) => {
                     return;
                 }
 
+                const selectFunction = type === 'single' ? 'selectAsset' : 
+                                      type === 'from' ? 'selectTradeAssetFrom' : 'selectTradeAssetTo';
+
                 const html = results.map(asset => \`
                     <div class="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0" 
-                         onclick="selectAsset('\${asset.symbol}', '\${asset.name}', '\${asset.category}', '\${asset.api_source}', '\${asset.api_id}')">
+                         onclick="\${selectFunction}('\${asset.symbol}', '\${asset.name}', '\${asset.category}', '\${asset.api_source}', '\${asset.api_id}')">
                         <div class="flex justify-between items-center">
                             <div>
                                 <span class="font-medium text-gray-800">\${asset.symbol}</span>
@@ -1187,13 +1470,69 @@ app.get('/transactions', (c) => {
                 fetchCurrentPrice();
             }
 
-            // Clear selected asset
+            // Select trade asset (FROM - what you're selling)
+            function selectTradeAssetFrom(symbol, name, category, apiSource, apiId) {
+                selectedAssetFromData = {
+                    symbol: symbol,
+                    name: name,
+                    category: category,
+                    api_source: apiSource,
+                    api_id: apiId
+                };
+
+                document.getElementById('selectedSymbolFrom').textContent = symbol;
+                document.getElementById('selectedNameFrom').textContent = name;
+                document.getElementById('selectedAssetFrom').classList.remove('hidden');
+                document.getElementById('assetFromSearch').value = \`\${symbol} - \${name}\`;
+                
+                hideTradeSearchResults('from');
+            }
+
+            // Select trade asset (TO - what you're receiving)
+            function selectTradeAssetTo(symbol, name, category, apiSource, apiId) {
+                selectedAssetToData = {
+                    symbol: symbol,
+                    name: name,
+                    category: category,
+                    api_source: apiSource,
+                    api_id: apiId
+                };
+
+                document.getElementById('selectedSymbolTo').textContent = symbol;
+                document.getElementById('selectedNameTo').textContent = name;
+                document.getElementById('selectedAssetTo').classList.remove('hidden');
+                document.getElementById('assetToSearch').value = \`\${symbol} - \${name}\`;
+                
+                hideTradeSearchResults('to');
+            }
+
+            // Clear selected asset (single)
             function clearSelectedAsset() {
                 selectedAssetData = null;
                 document.getElementById('selectedAsset').classList.add('hidden');
                 document.getElementById('assetSearch').value = '';
                 document.getElementById('pricePerUnit').value = '';
                 calculateTotal();
+            }
+
+            // Clear trade assets
+            function clearSelectedAssetFrom() {
+                selectedAssetFromData = null;
+                document.getElementById('selectedAssetFrom').classList.add('hidden');
+                document.getElementById('assetFromSearch').value = '';
+            }
+
+            function clearSelectedAssetTo() {
+                selectedAssetToData = null;
+                document.getElementById('selectedAssetTo').classList.add('hidden');
+                document.getElementById('assetToSearch').value = '';
+            }
+
+            function clearTradeAssets() {
+                clearSelectedAssetFrom();
+                clearSelectedAssetTo();
+                document.getElementById('quantityFrom').value = '';
+                document.getElementById('quantityTo').value = '';
             }
 
             // Fetch current price for selected asset
@@ -1232,39 +1571,87 @@ app.get('/transactions', (c) => {
             async function handleFormSubmit(e) {
                 e.preventDefault();
                 
-                if (!selectedAssetData) {
-                    alert('Debes seleccionar un activo');
-                    return;
-                }
+                const transactionType = document.getElementById('transactionType').value;
+                const exchange = document.getElementById('exchange').value;
+                const fees = parseFloat(document.getElementById('fees').value) || 0;
+                const notes = document.getElementById('notes').value;
+                const transactionDate = document.getElementById('transactionDate').value;
 
-                const formData = {
-                    type: document.getElementById('transactionType').value,
-                    asset_symbol: selectedAssetData.symbol,
-                    asset_name: selectedAssetData.name,
-                    category: selectedAssetData.category,
-                    api_source: selectedAssetData.api_source,
-                    api_id: selectedAssetData.api_id,
-                    exchange: document.getElementById('exchange').value,
-                    quantity: parseFloat(document.getElementById('quantity').value),
-                    price_per_unit: parseFloat(document.getElementById('pricePerUnit').value),
-                    fees: parseFloat(document.getElementById('fees').value) || 0,
-                    notes: document.getElementById('notes').value,
-                    transaction_date: document.getElementById('transactionDate').value
-                };
-
-                try {
-                    const response = await axios.post('/api/transactions', formData);
-                    
-                    if (response.data.success) {
-                        alert('Transacción registrada exitosamente');
-                        resetForm();
-                        loadTransactions();
-                    } else {
-                        alert('Error: ' + response.data.error);
+                if (transactionType === 'trade') {
+                    // Handle trade (creates two transactions)
+                    if (!selectedAssetFromData || !selectedAssetToData) {
+                        alert('Debes seleccionar ambos activos para el trade');
+                        return;
                     }
-                } catch (error) {
-                    console.error('Error creating transaction:', error);
-                    alert('Error al registrar la transacción');
+
+                    const quantityFrom = parseFloat(document.getElementById('quantityFrom').value);
+                    const quantityTo = parseFloat(document.getElementById('quantityTo').value);
+
+                    if (!quantityFrom || !quantityTo) {
+                        alert('Debes ingresar las cantidades de ambos activos');
+                        return;
+                    }
+
+                    try {
+                        const response = await axios.post('/api/transactions/trade', {
+                            asset_from: selectedAssetFromData,
+                            asset_to: selectedAssetToData,
+                            quantity_from: quantityFrom,
+                            quantity_to: quantityTo,
+                            exchange: exchange,
+                            fees: fees,
+                            notes: notes,
+                            transaction_date: transactionDate
+                        });
+                        
+                        if (response.data.success) {
+                            alert('Trade registrado exitosamente');
+                            resetForm();
+                            loadTransactions();
+                        } else {
+                            alert('Error: ' + response.data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error creating trade:', error);
+                        alert('Error al registrar el trade');
+                    }
+
+                } else {
+                    // Handle buy/sell
+                    if (!selectedAssetData) {
+                        alert('Debes seleccionar un activo');
+                        return;
+                    }
+
+                    const formData = {
+                        type: transactionType,
+                        asset_symbol: selectedAssetData.symbol,
+                        asset_name: selectedAssetData.name,
+                        category: selectedAssetData.category,
+                        api_source: selectedAssetData.api_source,
+                        api_id: selectedAssetData.api_id,
+                        exchange: exchange,
+                        quantity: parseFloat(document.getElementById('quantity').value),
+                        price_per_unit: parseFloat(document.getElementById('pricePerUnit').value),
+                        fees: fees,
+                        notes: notes,
+                        transaction_date: transactionDate
+                    };
+
+                    try {
+                        const response = await axios.post('/api/transactions', formData);
+                        
+                        if (response.data.success) {
+                            alert('Transacción registrada exitosamente');
+                            resetForm();
+                            loadTransactions();
+                        } else {
+                            alert('Error: ' + response.data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error creating transaction:', error);
+                        alert('Error al registrar la transacción');
+                    }
                 }
             }
 
@@ -1272,6 +1659,14 @@ app.get('/transactions', (c) => {
             function resetForm() {
                 document.getElementById('transactionForm').reset();
                 clearSelectedAsset();
+                clearTradeAssets();
+                
+                // Reset UI sections
+                document.getElementById('singleAssetSection').classList.remove('hidden');
+                document.getElementById('quantitySection').classList.remove('hidden');
+                document.getElementById('priceSection').classList.remove('hidden');
+                document.getElementById('totalSection').classList.remove('hidden');
+                document.getElementById('tradeSection').classList.add('hidden');
                 
                 // Reset date to now
                 const now = new Date();
@@ -1280,6 +1675,8 @@ app.get('/transactions', (c) => {
                 
                 document.getElementById('fees').value = '0';
                 calculateTotal();
+                
+                currentTransactionType = '';
             }
 
             // Load recent transactions (last 3 days)
@@ -1329,11 +1726,14 @@ app.get('/transactions', (c) => {
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full \${
                                             tx.type === 'buy' ? 'bg-green-100 text-green-800' : 
                                             tx.type === 'sell' ? 'bg-red-100 text-red-800' : 
-                                            'bg-blue-100 text-blue-800'
+                                            tx.type === 'trade_in' ? 'bg-blue-100 text-blue-800' :
+                                            tx.type === 'trade_out' ? 'bg-purple-100 text-purple-800' :
+                                            'bg-gray-100 text-gray-800'
                                         }">
-                                            \${tx.type === 'buy' ? 'Compra' : 
-                                              tx.type === 'sell' ? 'Venta' : 
-                                              tx.type === 'trade_in' ? 'Trade In' : 'Trade Out'}
+                                            \${tx.type === 'buy' ? '💰 Compra' : 
+                                              tx.type === 'sell' ? '💵 Venta' : 
+                                              tx.type === 'trade_in' ? '⬅️ Trade In' : 
+                                              tx.type === 'trade_out' ? '➡️ Trade Out' : tx.type}
                                         </span>
                                     </td>
                                     <td class="px-4 py-3">
@@ -1378,15 +1778,31 @@ app.get('/transactions', (c) => {
             }
 
             // Show search loading state
-            function showSearchLoading() {
-                document.getElementById('searchResults').innerHTML = 
-                    '<div class="p-4 text-center"><i class="fas fa-spinner fa-spin text-blue-600"></i> Buscando...</div>';
-                document.getElementById('searchResults').classList.remove('hidden');
+            function showSearchLoading(type = 'single') {
+                const containerId = type === 'single' ? 'searchResults' : 
+                                   type === 'from' ? 'searchResultsFrom' : 'searchResultsTo';
+                const container = document.getElementById(containerId);
+                container.innerHTML = '<div class="p-4 text-center"><i class="fas fa-spinner fa-spin text-blue-600"></i> Buscando...</div>';
+                container.classList.remove('hidden');
             }
 
             // Hide search results
-            function hideSearchResults() {
-                document.getElementById('searchResults').classList.add('hidden');
+            function hideSearchResults(type = 'single') {
+                const containerId = type === 'single' ? 'searchResults' : 
+                                   type === 'from' ? 'searchResultsFrom' : 'searchResultsTo';
+                document.getElementById(containerId).classList.add('hidden');
+            }
+
+            // Hide trade search results
+            function hideTradeSearchResults(type) {
+                hideSearchResults(type);
+            }
+
+            // Hide all search results
+            function hideAllSearchResults() {
+                hideSearchResults('single');
+                hideSearchResults('from');
+                hideSearchResults('to');
             }
 
             // Show all transactions (placeholder)
