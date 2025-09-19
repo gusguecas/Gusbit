@@ -2077,6 +2077,58 @@ app.post('/api/wallet/update-prices', async (c) => {
   }
 })
 
+// Delete asset and all related data
+app.delete('/api/wallet/asset/:symbol', async (c) => {
+  try {
+    const symbol = c.req.param('symbol')
+    
+    // Verify asset exists
+    const asset = await c.env.DB.prepare('SELECT * FROM assets WHERE symbol = ?').bind(symbol).first()
+    
+    if (!asset) {
+      return c.json({ error: 'Asset not found' }, 404)
+    }
+    
+    // Count existing data before deletion for reporting
+    const transactionsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM transactions WHERE asset_symbol = ?').bind(symbol).first()
+    const snapshotsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM daily_snapshots WHERE asset_symbol = ?').bind(symbol).first()
+    const holdingsCount = await c.env.DB.prepare('SELECT COUNT(*) as count FROM holdings WHERE asset_symbol = ?').bind(symbol).first()
+    
+    // Start transaction-like deletions (D1 doesn't support transactions yet, but we'll do sequentially)
+    
+    // 1. Delete all daily snapshots
+    await c.env.DB.prepare('DELETE FROM daily_snapshots WHERE asset_symbol = ?').bind(symbol).run()
+    
+    // 2. Delete all transactions
+    await c.env.DB.prepare('DELETE FROM transactions WHERE asset_symbol = ?').bind(symbol).run()
+    
+    // 3. Delete holdings record
+    await c.env.DB.prepare('DELETE FROM holdings WHERE asset_symbol = ?').bind(symbol).run()
+    
+    // 4. Delete the asset itself
+    await c.env.DB.prepare('DELETE FROM assets WHERE symbol = ?').bind(symbol).run()
+    
+    console.log(`🗑️ Asset ${symbol} deleted: ${transactionsCount.count} transactions, ${snapshotsCount.count} snapshots, ${holdingsCount.count} holdings`)
+    
+    return c.json({
+      success: true,
+      message: `Asset ${symbol} deleted successfully`,
+      transactions_deleted: transactionsCount.count || 0,
+      snapshots_deleted: snapshotsCount.count || 0,
+      holdings_deleted: holdingsCount.count || 0,
+      asset_name: asset.name
+    })
+    
+  } catch (error) {
+    console.error('Error deleting asset:', error)
+    return c.json({ 
+      success: false,
+      error: 'Error deleting asset',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // Generate historical snapshots for ALL assets (admin function)
 app.post('/api/admin/generate-all-historical-snapshots', async (c) => {
   try {
@@ -3373,6 +3425,18 @@ app.get('/wallet', (c) => {
                                 <div class="mt-4 text-xs text-gray-500 text-center">
                                     Actualizado: \${new Date(holding.price_updated_at || holding.last_updated).toLocaleString('es-ES')}
                                 </div>
+                                
+                                <!-- Delete Asset Button -->
+                                <div class="mt-4 pt-4 border-t border-gray-100">
+                                    <button 
+                                        onclick="confirmDeleteAsset('\${holding.asset_symbol}', '\${holding.name}'); event.stopPropagation();"
+                                        class="w-full px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors duration-200 flex items-center justify-center"
+                                        title="Eliminar este activo y todos sus datos"
+                                    >
+                                        <i class="fas fa-trash-alt mr-2"></i>
+                                        Eliminar Activo
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     \`;
@@ -3453,6 +3517,44 @@ app.get('/wallet', (c) => {
                         <span class="text-gray-600 text-lg">Error cargando activos</span>
                     </div>
                 \`;
+            }
+
+            // Delete Asset Functions
+            function confirmDeleteAsset(symbol, name) {
+                const message = \`¿Estás seguro de que deseas eliminar el activo "\${name}" (\${symbol})?
+                
+⚠️ ADVERTENCIA: Esta acción eliminará permanentemente:
+• Todas las transacciones de este activo
+• Todos los registros históricos (snapshots diarios)  
+• Los datos de holdings actuales
+• Toda la información relacionada
+
+Esta acción NO se puede deshacer.
+
+¿Continuar con la eliminación?\`;
+
+                if (confirm(message)) {
+                    deleteAsset(symbol, name);
+                }
+            }
+
+            async function deleteAsset(symbol, name) {
+                try {
+                    const response = await axios.delete(\`/api/wallet/asset/\${symbol}\`);
+                    
+                    if (response.data.success) {
+                        // Show success message
+                        alert(\`✅ El activo "\${name}" ha sido eliminado exitosamente.\n\nDatos eliminados:\n• \${response.data.transactions_deleted || 0} transacciones\n• \${response.data.snapshots_deleted || 0} snapshots históricos\n• 1 holding eliminado\`);
+                        
+                        // Reload the holdings to reflect changes
+                        loadHoldings(currentCategory);
+                    } else {
+                        alert('❌ Error eliminando el activo: ' + (response.data.error || 'Error desconocido'));
+                    }
+                } catch (error) {
+                    console.error('Error deleting asset:', error);
+                    alert('❌ Error eliminando el activo. Por favor intenta de nuevo.');
+                }
             }
 
             // Logout function
