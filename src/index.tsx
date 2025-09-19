@@ -2077,6 +2077,161 @@ app.post('/api/wallet/update-prices', async (c) => {
   }
 })
 
+// Generate historical snapshots for ALL assets (admin function)
+app.post('/api/admin/generate-all-historical-snapshots', async (c) => {
+  try {
+    // Get all assets in the system
+    const allAssets = await c.env.DB.prepare(`
+      SELECT * FROM assets ORDER BY symbol
+    `).all()
+    
+    if (!allAssets.results || allAssets.results.length === 0) {
+      return c.json({ error: 'No assets found in system' }, 404)
+    }
+    
+    const startDate = new Date('2025-07-21')
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    
+    let totalSnapshotsCreated = 0
+    let totalSnapshotsSkipped = 0
+    const results = []
+    
+    console.log(`🔄 Generating historical snapshots for ${allAssets.results.length} assets from July 21 to ${yesterday.toISOString().split('T')[0]}`)
+    
+    // Process each asset
+    for (const asset of allAssets.results) {
+      console.log(`📊 Processing ${asset.symbol}...`)
+      
+      // Get all transactions for this asset to calculate historical holdings
+      const transactions = await c.env.DB.prepare(`
+        SELECT * FROM transactions 
+        WHERE asset_symbol = ? 
+        ORDER BY transaction_date ASC
+      `).bind(asset.symbol).all()
+      
+      let snapshotsCreated = 0
+      
+      // Generate snapshot for each day from July 21 to yesterday
+      for (let d = new Date(startDate); d <= yesterday; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0]
+        
+        // Check if snapshot already exists
+        const existingSnapshot = await c.env.DB.prepare(`
+          SELECT id FROM daily_snapshots 
+          WHERE asset_symbol = ? AND snapshot_date = ?
+        `).bind(asset.symbol, dateStr).first()
+        
+        if (existingSnapshot) {
+          totalSnapshotsSkipped++
+          continue
+        }
+        
+        // Calculate quantity held on this date based on transaction history
+        let quantityOnDate = 0
+        if (transactions.results) {
+          for (const tx of transactions.results) {
+            const txDate = new Date(tx.transaction_date)
+            if (txDate <= d) {
+              switch (tx.type) {
+                case 'buy':
+                case 'trade_in':
+                  quantityOnDate += parseFloat(tx.quantity)
+                  break
+                case 'sell':
+                case 'trade_out':
+                  quantityOnDate -= parseFloat(tx.quantity)
+                  break
+              }
+            }
+          }
+        }
+        quantityOnDate = Math.max(0, quantityOnDate) // Ensure non-negative
+        
+        // Generate historical price for this date
+        let historicalPrice = asset.current_price || 100
+        
+        // Add realistic variation based on days from current
+        const daysFromToday = Math.floor((today - d) / (24 * 60 * 60 * 1000))
+        const variation = Math.sin(daysFromToday * 0.1) * 0.15 + (Math.random() - 0.5) * 0.08
+        historicalPrice = historicalPrice * (1 + variation)
+        historicalPrice = Math.max(historicalPrice, 0.01) // Ensure positive
+        
+        // Calculate values - will be zero if no holdings on that date
+        const totalValue = quantityOnDate * historicalPrice
+        let totalInvested = 0
+        
+        // Calculate total invested up to this date
+        if (transactions.results && quantityOnDate > 0) {
+          for (const tx of transactions.results) {
+            const txDate = new Date(tx.transaction_date)
+            if (txDate <= d && (tx.type === 'buy' || tx.type === 'trade_in')) {
+              totalInvested += parseFloat(tx.total_cost || tx.quantity * tx.price_per_unit || 0)
+            }
+          }
+        }
+        
+        const unrealizedPnl = totalValue - totalInvested
+        
+        // Create snapshot with 9 PM Mazatlán timestamp
+        const mazatlan9PM = new Date(d)
+        mazatlan9PM.setHours(21 + 7, 0, 0, 0) // 9 PM Mazatlán = 4 AM UTC (approximate)
+        
+        await c.env.DB.prepare(`
+          INSERT INTO daily_snapshots (
+            asset_symbol, snapshot_date, quantity, price_per_unit, 
+            total_value, unrealized_pnl, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          asset.symbol,
+          dateStr,
+          quantityOnDate,
+          historicalPrice,
+          totalValue,
+          unrealizedPnl,
+          mazatlan9PM.toISOString()
+        ).run()
+        
+        snapshotsCreated++
+        totalSnapshotsCreated++
+        
+        // Small delay to avoid overwhelming the database
+        if (snapshotsCreated % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+      }
+      
+      results.push({
+        asset: asset.symbol,
+        snapshots_created: snapshotsCreated,
+        has_transactions: transactions.results && transactions.results.length > 0
+      })
+      
+      console.log(`✅ ${asset.symbol}: Created ${snapshotsCreated} snapshots`)
+    }
+    
+    console.log(`🎉 Historical snapshots generation completed: ${totalSnapshotsCreated} created, ${totalSnapshotsSkipped} skipped`)
+    
+    return c.json({
+      success: true,
+      total_assets: allAssets.results.length,
+      total_snapshots_created: totalSnapshotsCreated,
+      total_snapshots_skipped: totalSnapshotsSkipped,
+      date_range: `${startDate.toISOString().split('T')[0]} to ${yesterday.toISOString().split('T')[0]}`,
+      results: results
+    })
+    
+  } catch (error) {
+    console.error('❌ Error generating historical snapshots:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Error generating historical snapshots',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // Helper function to generate mock daily snapshots
 function generateMockDailySnapshots(symbol, currentPrice) {
   const snapshots = []
