@@ -1885,14 +1885,16 @@ app.post('/api/wallet/asset/:symbol/generate-snapshots', async (c) => {
       return c.json({ error: 'Asset not found in holdings' }, 404)
     }
     
-    // Generate daily snapshots from July 21, 2025 to today
+    // Generate daily snapshots from July 21, 2025 to yesterday (not including today)
     const startDate = new Date('2025-07-21')
     const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1) // Stop at yesterday, not today
     const msPerDay = 24 * 60 * 60 * 1000
     
     let snapshotsCreated = 0
     
-    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(startDate); d <= yesterday; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0]
       
       // Check if snapshot already exists
