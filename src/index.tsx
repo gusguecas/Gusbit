@@ -4702,10 +4702,16 @@ app.get('/import', (c) => {
                     </h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="flex items-center space-x-3">
-                                <input type="checkbox" id="clearExisting" class="w-4 h-4 text-red-600 bg-slate-700 border-slate-600 rounded focus:ring-red-500">
-                                <span class="executive-text-secondary">Eliminar datos existentes antes de importar</span>
+                        <div class="space-y-2">
+                            <label class="flex items-start space-x-3">
+                                <input type="checkbox" id="clearExisting" class="w-4 h-4 text-red-600 bg-slate-700 border-slate-600 rounded focus:ring-red-500 mt-1">
+                                <div>
+                                    <span class="executive-text-primary font-medium">🗑️ Eliminar TODOS los datos existentes</span>
+                                    <div class="text-xs text-red-400 mt-1">
+                                        ⚠️ Borrará completamente: assets, transacciones, holdings, snapshots y precio histórico.<br>
+                                        <strong>Recomendado para importar datos reales por primera vez.</strong>
+                                    </div>
+                                </div>
                             </label>
                         </div>
                         <div>
@@ -4940,6 +4946,27 @@ app.get('/import', (c) => {
                     return;
                 }
                 
+                // Check if user wants to clear existing data and confirm
+                const clearExisting = document.getElementById('clearExisting').checked;
+                if (clearExisting) {
+                    const confirmed = confirm(
+                        '⚠️ CONFIRMACIÓN REQUERIDA ⚠️\\n\\n' +
+                        'Estás a punto de ELIMINAR PERMANENTEMENTE todos los datos existentes:\\n\\n' +
+                        '• Todos los assets\\n' +
+                        '• Todas las transacciones\\n' +
+                        '• Todos los holdings\\n' +
+                        '• Todo el historial de precios\\n' +
+                        '• Todos los snapshots diarios\\n\\n' +
+                        'Esta acción NO SE PUEDE DESHACER.\\n\\n' +
+                        '¿Estás seguro de que quieres continuar?'
+                    );
+                    
+                    if (!confirmed) {
+                        showError('Importación cancelada por el usuario.');
+                        return;
+                    }
+                }
+                
                 const importBtn = document.getElementById('importBtn');
                 const importProgress = document.getElementById('importProgress');
                 const progressBar = document.getElementById('progressBar');
@@ -4959,8 +4986,13 @@ app.get('/import', (c) => {
                         }
                     };
                     
-                    progressText.textContent = 'Enviando datos al servidor...';
-                    progressBar.style.width = '25%';
+                    if (clearExisting) {
+                        progressText.textContent = '🗑️ Eliminando todos los datos existentes...';
+                        progressBar.style.width = '10%';
+                    } else {
+                        progressText.textContent = 'Enviando datos al servidor...';
+                        progressBar.style.width = '25%';
+                    }
                     
                     // Send to backend
                     const response = await axios.post('/api/import/daily-snapshots', importData);
@@ -4989,7 +5021,12 @@ app.get('/import', (c) => {
                 let html = '<div class="space-y-4">';
                 
                 if (results.success) {
-                    html += '<div class="flex items-center space-x-3 text-green-400"><i class="fas fa-check-circle"></i><span>Importación exitosa!</span></div>';
+                    html += '<div class="flex items-center space-x-3 text-green-400"><i class="fas fa-check-circle"></i><span>¡Importación exitosa!</span></div>';
+                    
+                    if (results.dataCleared) {
+                        html += '<div class="flex items-center space-x-3 text-orange-400 mt-2"><i class="fas fa-trash-alt"></i><span>Datos existentes eliminados completamente</span></div>';
+                    }
+                    
                     html += '<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">';
                     html += '<div class="bg-green-900 bg-opacity-30 rounded-lg p-4 border border-green-500 border-opacity-30">';
                     html += '<div class="text-2xl font-bold text-green-400">' + results.imported + '</div>';
@@ -5068,9 +5105,25 @@ app.post('/api/import/daily-snapshots', async (c) => {
 
     // Clear existing data if requested
     if (options.clearExisting) {
-      console.log('Clearing existing daily snapshots...')
+      console.log('🗑️ CLEARING ALL EXISTING DATA...')
+      
+      // Clear all portfolio data tables (but keep config)
       await DB.prepare('DELETE FROM daily_snapshots').run()
-      console.log('Existing data cleared')
+      console.log('✅ Daily snapshots cleared')
+      
+      await DB.prepare('DELETE FROM holdings').run()
+      console.log('✅ Holdings cleared')
+      
+      await DB.prepare('DELETE FROM transactions').run()
+      console.log('✅ Transactions cleared')
+      
+      await DB.prepare('DELETE FROM price_history').run()
+      console.log('✅ Price history cleared')
+      
+      await DB.prepare('DELETE FROM assets').run()
+      console.log('✅ Assets cleared')
+      
+      console.log('🎯 ALL DEMO DATA COMPLETELY REMOVED - Ready for real data!')
     }
 
     // Process each record
@@ -5169,7 +5222,10 @@ app.post('/api/import/daily-snapshots', async (c) => {
       imported: importedCount,
       skipped: skippedCount,
       assets: assetsProcessed.size,
-      message: 'Daily snapshots imported successfully'
+      dataCleared: options.clearExisting,
+      message: options.clearExisting ? 
+        'All existing data cleared and new data imported successfully' : 
+        'Daily snapshots imported successfully'
     })
 
   } catch (error) {
