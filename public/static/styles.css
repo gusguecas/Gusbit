@@ -49,12 +49,13 @@
 }
 
 /* ==========================================
-   GLOBAL BACKGROUND & BASE STYLES
+   GLOBAL BACKGROUND & BASE STYLES - DARK EXECUTIVE
    ========================================== */
 body {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
   background-attachment: fixed;
   min-height: 100vh;
+  color: #f1f5f9;
 }
 
 /* Content wrapper with subtle background */
@@ -479,4 +480,465 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-500);
+}
+
+/* ==========================================
+   FORM COMPONENTS - TRANSACTION PAGE
+   ========================================== */
+
+/* Glass Card Effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
+}
+
+/* Form Labels */
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+
+/* Form Inputs */
+.form-input {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  transform: translateY(-1px);
+}
+
+.form-input:hover {
+  border-color: var(--gray-300);
+}
+
+/* Form Select */
+.form-select {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 40px;
+  appearance: none;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* COLORED BUTTONS - FUNCTIONAL COLOR CODING */
+
+/* Primary Button (BLUE - Main Actions) */
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.4);
+}
+
+/* Secondary Button (GRAY - Neutral Actions) */
+.btn-secondary {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  color: var(--gray-700);
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: 2px solid var(--gray-300);
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-color: var(--gray-400);
+  transform: translateY(-1px);
+}
+
+/* Success Button (GREEN - Buy/Positive Actions) */
+.btn-success {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(34, 197, 94, 0.4);
+}
+
+/* Danger Button (RED - Sell/Delete Actions) */
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(239, 68, 68, 0.4);
+}
+
+/* TRANSACTION TYPE INDICATORS */
+
+/* Buy Transaction Styling (GREEN) */
+.transaction-buy {
+  border-left: 4px solid var(--green-500);
+  background: linear-gradient(135deg, var(--green-50) 0%, #ffffff 100%);
+}
+
+.transaction-buy .transaction-type {
+  color: var(--green-600);
+  background: var(--green-100);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Sell Transaction Styling (RED) */
+.transaction-sell {
+  border-left: 4px solid var(--red-500);
+  background: linear-gradient(135deg, var(--red-50) 0%, #ffffff 100%);
+}
+
+.transaction-sell .transaction-type {
+  color: var(--red-600);
+  background: var(--red-100);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Trade Transaction Styling (BLUE) */
+.transaction-trade {
+  border-left: 4px solid var(--blue-600);
+  background: linear-gradient(135deg, var(--blue-50) 0%, #ffffff 100%);
+}
+
+.transaction-trade .transaction-type {
+  color: var(--blue-600);
+  background: var(--blue-100);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ASSET CATEGORY BADGES */
+.asset-badge-crypto {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.asset-badge-stocks {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.asset-badge-etfs {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Navigation Links */
+.nav-link {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  padding: 12px 20px;
+  margin: 0 4px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.nav-link.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================
+   ASSET QUICK BUTTONS - LIVE PRICES
+   ========================================== */
+.asset-quick-btn {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  z-index: 1; /* Low z-index to stay behind dropdown */
+}
+
+.asset-quick-btn:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary-blue);
+  box-shadow: 0 12px 25px rgba(37, 99, 235, 0.15);
+  background: white;
+}
+
+.asset-quick-btn:active {
+  transform: translateY(0);
+}
+
+/* Search dropdown - HIGHEST z-index */
+#priceSearchResults {
+  z-index: 9999 !important;
+  position: absolute !important;
+}
+
+/* ==========================================
+   EXECUTIVE THEME - PREMIUM STYLING
+   ========================================== */
+
+/* Executive Navigation - Dark */
+.nav-modern {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+/* Executive Card Components - Dark */
+.executive-card {
+  background: linear-gradient(145deg, #1e293b 0%, #334155 100%);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.executive-border {
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.executive-shadow {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 2px 10px -2px rgba(59, 130, 246, 0.1);
+}
+
+/* Executive Text Colors - Dark */
+.executive-text-primary {
+  color: #f1f5f9;
+}
+
+.executive-text-secondary {
+  color: #94a3b8;
+}
+
+/* Executive Background Utilities */
+.executive-bg-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+/* Executive Chart Containers */
+.executive-chart {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Executive Button Variants */
+.executive-btn {
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  transition: all 0.2s ease;
+}
+
+.executive-btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 3px 12px -1px rgba(37, 99, 235, 0.3);
+}
+
+.executive-btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -1px rgba(37, 99, 235, 0.4);
+}
+
+.executive-btn-secondary {
+  background: linear-gradient(145deg, #334155 0%, #475569 100%);
+  color: #f1f5f9;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.executive-btn-secondary:hover {
+  background: linear-gradient(145deg, #475569 0%, #64748b 100%);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Executive Asset Cards - Dark */
+.executive-asset-item {
+  background: linear-gradient(145deg, #334155 0%, #475569 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.executive-asset-item:hover {
+  background: linear-gradient(145deg, #475569 0%, #64748b 100%);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px -2px rgba(59, 130, 246, 0.2);
+}
+
+/* Executive Transaction Items - Dark */
+.executive-transaction {
+  background: linear-gradient(145deg, #334155 0%, #475569 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.executive-transaction:hover {
+  background: linear-gradient(145deg, #475569 0%, #64748b 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Executive Status Indicators */
+.executive-status-positive {
+  color: #059669;
+  background: #d1fae5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.executive-status-negative {
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.executive-status-neutral {
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Executive Typography */
+.executive-heading {
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  color: #1e293b;
+}
+
+.executive-subheading {
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* Executive Accent Line */
+.executive-accent {
+  height: 3px;
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+  border-radius: 2px;
+}
+
+/* Executive Mobile Responsive */
+@media (max-width: 768px) {
+  .executive-card {
+    padding: 20px !important;
+  }
+  
+  .executive-text-primary {
+    font-size: 1.5rem !important;
+  }
+  
+  .executive-heading {
+    font-size: 1.75rem !important;
+  }
 }
