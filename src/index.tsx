@@ -5816,25 +5816,60 @@ app.get('/asset/:symbol', (c) => {
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
-                            <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg">
-                                <i class="fas fa-chart-line text-white text-lg font-bold"></i>
-                            </div>
-                            <div class="flex items-center">
-                                <span class="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-700 bg-clip-text text-transparent">GusBit</span>
+                            <div class="flex items-center space-x-4">
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
+                                <div class="flex flex-col items-start">
+                                    <!-- GB con formas exactas y spacing perfecto -->
+                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
+                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
+                                    </div>
+                                    
+                                    <!-- GusBit con el mismo estilo tipográfico -->
+                                    <div class="-mt-1">
+                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                                            GusBit
+                                        </h1>
+                                        
+                                        <!-- Tagline con spacing perfecto -->
+                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                                            TRACK STOCKS<br>
+                                            ETFS &amp; CRYPTO
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="flex space-x-8">
-                            <a href="/" class="text-slate-600 hover:text-blue-600 transition-colors font-medium flex items-center">
-                                <i class="fas fa-home mr-2"></i>Dashboard
+                        <nav class="hidden md:flex space-x-2">
+                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Dashboard
                             </a>
-                            <a href="/wallet" class="text-slate-600 hover:text-blue-600 transition-colors font-medium flex items-center">
-                                <i class="fas fa-wallet mr-2"></i>Portfolio
+                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
                             </a>
-                            <span class="text-blue-600 font-medium flex items-center">
-                                <i class="fas fa-chart-area mr-2"></i>${symbol} Details
-                            </span>
-                        </div>
+                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-briefcase mr-2"></i>
+                                Portfolio
+                            </a>
+                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-upload mr-2"></i>
+                                Importar
+                            </a>
+                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-area mr-2"></i>
+                                Markets
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
+                            </a>
+                        </nav>
                     </div>
+                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
+                        <i class="fas fa-power-off mr-2"></i>
+                        Salir
+                    </button>
                 </div>
             </div>
         </nav>
