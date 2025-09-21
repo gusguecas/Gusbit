@@ -352,6 +352,10 @@ app.get('/', (c) => {
                                 <i class="fas fa-chart-area mr-2"></i>
                                 Markets
                             </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
+                            </a>
                         </nav>
                     </div>
                     <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
