@@ -31,6 +31,15 @@
   - Added: Organized assets list section with current values and performance indicators
   - Maintained: Existing pie chart for portfolio diversification
   - Enhanced: Better visual hierarchy and modern glass card design
+- **✅ Header Standardization**: All sections now have consistent modern navigation
+  - Unified GusBit branding with GB logo and professional tagline
+  - Complete navigation menu across all pages (Dashboard, Transacciones, Portfolio, Importar, Markets, Watchlist)
+  - Active page highlighting and consistent styling
+- **✅ CSV Import System**: Full-featured import functionality for historical data
+  - Dedicated /import page with drag-and-drop file upload
+  - Smart data replacement (clears daily snapshots, preserves transactions)
+  - CSV format validation and detailed error reporting
+  - Import statistics and status monitoring
 
 ## Current Functional Entry URIs
 
@@ -39,8 +48,9 @@
 - `GET /login` - Login page
 - `GET /transactions` - Transaction management (requires auth)
 - `GET /wallet` - Wallet/Portfolio view (requires auth)
-- `GET /prices` - **NEW: Live Prices Search** (requires auth)
+- `GET /prices` - **Live Prices Search** (requires auth) - Markets section
 - `GET /watchlist` - Watchlist management (requires auth)
+- `GET /import` - **NEW: CSV Import** (requires auth) - Historical data import functionality
 
 ### API Endpoints
 **Authentication & Core**
@@ -61,6 +71,10 @@
 - `GET /api/transactions` - Get transactions
 - `GET /api/transactions/recent` - Recent transactions for dashboard
 - `POST /api/transactions` - Add transaction
+
+**CSV Import & Historical Data**
+- `POST /api/import/csv` - **NEW**: Import CSV file and replace daily snapshots (preserves transactions)
+- `GET /api/import/status` - **NEW**: Get import statistics and current historical data status
 
 ## Data Architecture
 - **Data Models**: 
@@ -131,13 +145,25 @@ loadWatchlist()      // Load and display current watchlist
 - **Tech Stack**: Hono + TypeScript + TailwindCSS + Cloudflare D1
 - **Build Command**: `npm run build`
 - **Dev Command**: `npm run dev:sandbox` (with PM2)
-- **Last Updated**: September 19, 2025 - Dashboard Enhancement
+- **Last Updated**: September 21, 2025 - Header Standardization & CSV Import
+
+## Recently Completed Features ✅ (September 21, 2025)
+- **✅ Header Estandarization**: Unified modern header design across all sections
+  - All pages now use the same elegant GusBit logo with GB initials and tagline
+  - Consistent navigation menu with proper active states
+  - Modern nav-modern class styling throughout the application
+  - Complete navigation includes: Dashboard, Transacciones, Portfolio, Importar, Markets, Watchlist
+- **✅ CSV Import Functionality**: Complete system for importing historical data
+  - New /import page with file upload interface
+  - Automatic daily snapshots replacement (preserves transactions)
+  - CSV format validation and error reporting
+  - Import status and statistics display
+  - Database migration for enhanced transaction fields
 
 ## Features Not Yet Implemented
 - Real-time price updates (currently on-demand)
 - Price alerts and notifications
 - Advanced portfolio analytics (historical performance, Sharpe ratio, etc.)
-- Export/import functionality (CSV, Excel)
 - Mobile app version
 - Portfolio benchmarking against market indices
 

@@ -21,8 +21,14 @@ app.use('/static/*', serveStatic({ root: './public' }))
 const authMiddleware = async (c: any, next: any) => {
   const url = new URL(c.req.url)
   
-  // Skip auth for login page and API login endpoint
-  if (url.pathname === '/login' || url.pathname === '/api/auth/login' || url.pathname === '/force-snapshots' || url.pathname === '/auto-login') {
+  // Skip auth for login page, API endpoints, and special routes
+  if (url.pathname === '/login' || 
+      url.pathname === '/api/auth/login' || 
+      url.pathname === '/force-snapshots' || 
+      url.pathname === '/auto-login' || 
+      url.pathname === '/direct-import' || 
+      url.pathname === '/fix-holdings' ||
+      url.pathname.startsWith('/api/')) {
     return next()
   }
   
@@ -37,6 +43,28 @@ const authMiddleware = async (c: any, next: any) => {
 
 // Apply auth middleware to all routes except login
 app.use('*', authMiddleware)
+
+// ============================================
+// MANUAL SNAPSHOT TRIGGER (Development Only)
+// ============================================
+
+app.post('/api/manual-snapshot', async (c) => {
+  try {
+    console.log('🔧 Manual snapshot triggered via API')
+    const result = await processAllDailySnapshots(c.env.DB)
+    return c.json({
+      success: true,
+      message: 'Manual snapshot completed',
+      result: result
+    })
+  } catch (error) {
+    console.error('❌ Manual snapshot failed:', error)
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500)
+  }
+})
 
 // ============================================
 // AUTHENTICATION ROUTES
@@ -891,49 +919,104 @@ app.get('/', (c) => {
             function filterDataByTimeRange(data, timeRange) {
                 if (!data || data.length === 0) return [];
                 
-                // Get the latest date from the actual data, not current system time
-                const sortedData = data.sort((a, b) => new Date(b.date) - new Date(a.date));
+                console.log('=== TIME RANGE FILTER DEBUG ===');
+                console.log('Time range:', timeRange);
+                console.log('Input data count:', data.length);
+                console.log('Raw input data (last 5):', data.slice(-5));
+                
+                // SPECIFIC CHECK FOR SEPTEMBER 18TH
+                const sep18Data = data.filter(d => d.date === '2025-09-18');
+                console.log('🔍 SEPTEMBER 18TH CHECK:', sep18Data.length > 0 ? 'FOUND' : 'NOT FOUND');
+                if (sep18Data.length > 0) {
+                    console.log('Sep 18 data:', sep18Data[0]);
+                }
+                
+                // For 'ALL' timeRange, return all data without filtering
+                if (timeRange === 'ALL') {
+                    const allData = data.map(d => ({
+                        ...d, 
+                        value: d.totalValue,
+                        totalPnL: d.totalPnL,
+                        pnlPercentage: d.pnlPercentage,
+                        hasTransaction: d.hasTransaction
+                    }));
+                    console.log('ALL case: returning all data, count:', allData.length);
+                    console.log('Date range:', allData[0]?.date, 'to', allData[allData.length - 1]?.date);
+                    const sep18InAll = allData.filter(d => d.date === '2025-09-18');
+                    console.log('Sep 18 in ALL result:', sep18InAll.length > 0 ? 'INCLUDED' : 'MISSING');
+                    return allData;
+                }
+                
+                // Get the latest date from actual data
+                const sortedData = [...data].sort((a, b) => new Date(b.date) - new Date(a.date));
                 const latestDataDate = new Date(sortedData[0].date);
                 
+                console.log('Latest data date from API:', sortedData[0].date);
+                console.log('Latest data parsed:', latestDataDate.toISOString());
+                
                 let cutoffDate;
-                let filteredData;
                 
                 switch (timeRange) {
                     case '1H':
-                        // For hourly data, we need to use snapshots within the last hour
-                        // But since we only have daily snapshots, show last 2 days
+                    case '1D':
+                        // Show last 3 days for 1H/1D view
                         cutoffDate = new Date(latestDataDate.getTime() - (2 * 24 * 60 * 60 * 1000));
                         break;
-                    case '1D':
-                        // Show last 3 days for daily view
-                        cutoffDate = new Date(latestDataDate.getTime() - (3 * 24 * 60 * 60 * 1000));
-                        break;
                     case '1W':
-                        cutoffDate = new Date(latestDataDate.getTime() - (7 * 24 * 60 * 60 * 1000));
+                        cutoffDate = new Date(latestDataDate.getTime() - (6 * 24 * 60 * 60 * 1000));
                         break;
                     case '1M':
-                        cutoffDate = new Date(latestDataDate.getTime() - (30 * 24 * 60 * 60 * 1000));
+                        // Show last 30 days
+                        cutoffDate = new Date(latestDataDate.getTime() - (29 * 24 * 60 * 60 * 1000));
                         break;
                     case 'YTD':
                         cutoffDate = new Date(latestDataDate.getFullYear(), 0, 1);
                         break;
                     case '1Y':
-                        cutoffDate = new Date(latestDataDate.getTime() - (365 * 24 * 60 * 60 * 1000));
+                        cutoffDate = new Date(latestDataDate.getTime() - (364 * 24 * 60 * 60 * 1000));
                         break;
-                    case 'ALL':
                     default:
-                        filteredData = data.map(d => ({...d, value: d.totalValue}));
+                        cutoffDate = new Date(latestDataDate.getTime() - (29 * 24 * 60 * 60 * 1000));
                         break;
                 }
                 
-                if (!filteredData) {
-                    filteredData = data
-                        .filter(d => new Date(d.date) >= cutoffDate)
-                        .map(d => ({...d, value: d.totalValue}))
-                        .sort((a, b) => new Date(a.date) - new Date(b.date));
-                }
+                console.log('Cutoff date calculated:', cutoffDate.toISOString());
+                console.log('Cutoff date string:', cutoffDate.toISOString().split('T')[0]);
                 
-                console.log('Time filter:', timeRange, 'Cutoff:', cutoffDate?.toISOString(), 'Results:', filteredData.length);
+                // SPECIFIC CHECK FOR SEPTEMBER 18TH VS CUTOFF
+                console.log('🔍 Sep 18 vs cutoff: "2025-09-18" >= "' + cutoffDate.toISOString().split('T')[0] + '" =', "2025-09-18" >= cutoffDate.toISOString().split('T')[0]);
+                
+                const filteredData = data
+                    .filter(d => {
+                        // Simple string comparison for YYYY-MM-DD format
+                        const itemDateStr = d.date;
+                        const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
+                        const include = itemDateStr >= cutoffDateStr;
+                        if (itemDateStr.includes('2025-09-18') || itemDateStr.includes('2025-09-19') || itemDateStr.includes('2025-09-20')) {
+                            console.log('🎯 CRITICAL DATE CHECK:', itemDateStr, '>=', cutoffDateStr, '→', include);
+                        }
+                        return include;
+                    })
+                    .map(d => ({
+                        ...d, 
+                        value: d.totalValue || d.value,
+                        totalPnL: d.totalPnL,
+                        pnlPercentage: d.pnlPercentage,
+                        hasTransaction: d.hasTransaction
+                    }))
+                    .sort((a, b) => a.date.localeCompare(b.date));
+                
+                console.log('Final filtered data count:', filteredData.length);
+                if (filteredData.length > 0) {
+                    console.log('Final date range:', filteredData[0].date, 'to', filteredData[filteredData.length - 1].date);
+                    console.log('Last 5 dates in result:', filteredData.slice(-5).map(d => d.date));
+                    
+                    // FINAL CHECK FOR SEPTEMBER 18TH
+                    const sep18InResult = filteredData.filter(d => d.date === '2025-09-18');
+                    console.log('🚨 SEPTEMBER 18TH IN FINAL RESULT:', sep18InResult.length > 0 ? 'INCLUDED ✅' : 'MISSING ❌');
+                }
+                console.log('=== END TIME RANGE FILTER DEBUG ===');
+                
                 return filteredData;
             }
             
@@ -1021,22 +1104,46 @@ app.get('/', (c) => {
                 if (!data || data.length === 0) return;
                 
                 const latest = data[data.length - 1];
-                const previous = data.length > 1 ? data[data.length - 2] : latest;
-                
                 const currentValue = parseFloat(latest.value);
-                const previousValue = parseFloat(previous.value);
-                const change = currentValue - previousValue;
-                const changePercent = previousValue !== 0 ? (change / previousValue) * 100 : 0;
                 
                 document.getElementById('currentPortfolioValue').textContent = 
                     '$' + currentValue.toLocaleString('en-US', { minimumFractionDigits: 2 });
                 
-                const changeElement = document.getElementById('portfolioChange');
-                const changeClass = change >= 0 ? 'text-green-400' : 'text-red-400';
-                const changeIcon = change >= 0 ? '+' : '';
+                // Use real PnL data from API instead of calculating our own
+                const latestPnL = parseFloat(latest.totalPnL || 0);
+                const latestPnLPercent = parseFloat(latest.pnlPercentage || 0);
+                const hasTransaction = parseInt(latest.hasTransaction || 0);
                 
-                changeElement.innerHTML = 
-                    '<span class="' + changeClass + ' font-medium">' + changeIcon + change.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' (' + changeIcon + changePercent.toFixed(2) + '%)</span>';
+                const changeElement = document.getElementById('portfolioChange');
+                
+                // FIXED: Show transaction indicator or PnL with CORRECT COLORS
+                console.log('🔍 PnL Display Debug:', {
+                    hasTransaction: hasTransaction,
+                    latestPnL: latestPnL,
+                    latestPnLPercent: latestPnLPercent,
+                    date: latest.date
+                });
+                
+                if (hasTransaction) {
+                    changeElement.innerHTML = 
+                        '<span class="text-blue-400 font-medium"><i class="fas fa-exchange-alt mr-1"></i>Transacción registrada</span>';
+                } else {
+                    // FORCE correct colors - if negative, MUST be red
+                    const changeClass = latestPnL >= 0 ? 'text-green-400' : 'text-red-500';
+                    const changeIcon = latestPnL >= 0 ? '+' : '-';
+                    const displayPnL = Math.abs(latestPnL);
+                    const displayPercent = Math.abs(latestPnLPercent);
+                    
+                    console.log('🎯 Final display:', {
+                        changeClass: changeClass,
+                        changeIcon: changeIcon,
+                        displayPnL: displayPnL,
+                        displayPercent: displayPercent
+                    });
+                    
+                    changeElement.innerHTML = 
+                        '<span class="' + changeClass + ' font-bold">' + changeIcon + '$' + displayPnL.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' (' + changeIcon + displayPercent.toFixed(2) + '%)</span>';
+                }
             }
             
             function updatePortfolioStatistics(values) {
@@ -1760,29 +1867,102 @@ app.get('/api/portfolio/evolution', async (c) => {
     let queryParams = [];
     
     if (category === 'overview') {
-      // For overview, get all data (original query)
+      // For overview, get all data with daily PnL (only when quantity stays same)
       query = `
+        WITH daily_data AS (
+          SELECT 
+            DATE(snapshot_date) as date,
+            SUM(total_value) as totalValue,
+            SUM(quantity) as totalQuantity
+          FROM daily_snapshots
+          GROUP BY DATE(snapshot_date)
+        ),
+        daily_pnl AS (
+          SELECT 
+            date,
+            totalValue,
+            totalQuantity,
+            LAG(totalValue) OVER (ORDER BY date) as previousValue,
+            LAG(totalQuantity) OVER (ORDER BY date) as previousQuantity,
+            CASE 
+              WHEN LAG(totalQuantity) OVER (ORDER BY date) IS NOT NULL 
+                   AND ABS(totalQuantity - LAG(totalQuantity) OVER (ORDER BY date)) < 0.001
+              THEN totalValue - LAG(totalValue) OVER (ORDER BY date)
+              ELSE 0
+            END as dailyPnL,
+            CASE 
+              WHEN LAG(totalQuantity) OVER (ORDER BY date) IS NOT NULL 
+                   AND ABS(totalQuantity - LAG(totalQuantity) OVER (ORDER BY date)) < 0.001
+                   AND LAG(totalValue) OVER (ORDER BY date) > 0
+              THEN ROUND((totalValue - LAG(totalValue) OVER (ORDER BY date)) / LAG(totalValue) OVER (ORDER BY date) * 100, 2)
+              ELSE 0
+            END as dailyPnLPercentage,
+            CASE 
+              WHEN LAG(totalQuantity) OVER (ORDER BY date) IS NOT NULL 
+                   AND ABS(totalQuantity - LAG(totalQuantity) OVER (ORDER BY date)) >= 0.001
+              THEN 1
+              ELSE 0
+            END as hasTransaction
+          FROM daily_data
+        )
         SELECT 
-          DATE(snapshot_date) as date,
-          SUM(total_value) as totalValue
-        FROM daily_snapshots ds
-        JOIN holdings h ON ds.asset_symbol = h.asset_symbol
-        WHERE h.quantity > 0
-        GROUP BY DATE(snapshot_date)
-        ORDER BY DATE(snapshot_date) ASC
+          date,
+          totalValue,
+          dailyPnL as totalPnL,
+          dailyPnLPercentage as pnlPercentage,
+          hasTransaction
+        FROM daily_pnl
+        ORDER BY date ASC
       `
     } else {
-      // For specific categories, filter by asset category
+      // For specific categories with daily PnL (only when quantity stays same)
       query = `
+        WITH daily_data AS (
+          SELECT 
+            DATE(ds.snapshot_date) as date,
+            SUM(ds.total_value) as totalValue,
+            SUM(ds.quantity) as totalQuantity
+          FROM daily_snapshots ds
+          JOIN assets a ON ds.asset_symbol = a.symbol
+          WHERE a.category = ?
+          GROUP BY DATE(ds.snapshot_date)
+        ),
+        daily_pnl AS (
+          SELECT 
+            date,
+            totalValue,
+            totalQuantity,
+            LAG(totalValue) OVER (ORDER BY date) as previousValue,
+            LAG(totalQuantity) OVER (ORDER BY date) as previousQuantity,
+            CASE 
+              WHEN LAG(totalQuantity) OVER (ORDER BY date) IS NOT NULL 
+                   AND ABS(totalQuantity - LAG(totalQuantity) OVER (ORDER BY date)) < 0.001
+              THEN totalValue - LAG(totalValue) OVER (ORDER BY date)
+              ELSE 0
+            END as dailyPnL,
+            CASE 
+              WHEN LAG(totalQuantity) OVER (ORDER BY date) IS NOT NULL 
+                   AND ABS(totalQuantity - LAG(totalQuantity) OVER (ORDER BY date)) < 0.001
+                   AND LAG(totalValue) OVER (ORDER BY date) > 0
+              THEN ROUND((totalValue - LAG(totalValue) OVER (ORDER BY date)) / LAG(totalValue) OVER (ORDER BY date) * 100, 2)
+              ELSE 0
+            END as dailyPnLPercentage,
+            CASE 
+              WHEN LAG(totalQuantity) OVER (ORDER BY date) IS NOT NULL 
+                   AND ABS(totalQuantity - LAG(totalQuantity) OVER (ORDER BY date)) >= 0.001
+              THEN 1
+              ELSE 0
+            END as hasTransaction
+          FROM daily_data
+        )
         SELECT 
-          DATE(ds.snapshot_date) as date,
-          SUM(ds.total_value) as totalValue
-        FROM daily_snapshots ds
-        JOIN holdings h ON ds.asset_symbol = h.asset_symbol
-        JOIN assets a ON h.asset_symbol = a.symbol
-        WHERE h.quantity > 0 AND a.category = ?
-        GROUP BY DATE(ds.snapshot_date)
-        ORDER BY DATE(ds.snapshot_date) ASC
+          date,
+          totalValue,
+          dailyPnL as totalPnL,
+          dailyPnLPercentage as pnlPercentage,
+          hasTransaction
+        FROM daily_pnl
+        ORDER BY date ASC
       `
       queryParams = [category]
     }
@@ -1831,6 +2011,88 @@ app.get('/auto-login', async (c) => {
     maxAge: 86400
   })
   return c.redirect('/')
+})
+
+// Direct access to import page with auto-login
+app.get('/direct-import', async (c) => {
+  console.log('🎯 Direct import access with authentication')
+  // Set session cookie
+  setCookie(c, 'asset_session', 'authenticated', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: false,
+    maxAge: 86400
+  })
+  return c.redirect('/import')
+})
+
+// Emergency fix for existing data
+app.get('/fix-holdings', async (c) => {
+  try {
+    const { DB } = c.env
+    
+    console.log('🔧 EMERGENCY FIX: Creating holdings from existing daily snapshots...')
+    
+    // Get latest snapshot for each asset
+    const latestSnapshots = await DB.prepare(`
+      SELECT 
+        asset_symbol,
+        quantity,
+        price_per_unit,
+        total_value,
+        MAX(snapshot_date) as latest_date
+      FROM daily_snapshots 
+      GROUP BY asset_symbol
+    `).all()
+    
+    console.log('📊 Latest snapshots found:', latestSnapshots.results.length)
+    
+    let holdingsCreated = 0
+    
+    // Create holdings for each asset
+    for (const snapshot of latestSnapshots.results) {
+      try {
+        await DB.prepare(`
+          INSERT OR REPLACE INTO holdings (
+            asset_symbol, 
+            quantity, 
+            avg_purchase_price,
+            total_invested,
+            current_value,
+            unrealized_pnl,
+            last_updated
+          ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `).bind(
+          snapshot.asset_symbol,
+          snapshot.quantity,
+          snapshot.price_per_unit,
+          snapshot.total_value,
+          snapshot.total_value,
+          0
+        ).run()
+        
+        console.log(`✅ Holding created: ${snapshot.asset_symbol} - ${snapshot.quantity} @ $${snapshot.price_per_unit}`)
+        holdingsCreated++
+        
+      } catch (holdingError) {
+        console.error('❌ Error creating holding:', snapshot.asset_symbol, holdingError)
+      }
+    }
+    
+    console.log('🎉 Holdings repair completed!')
+    
+    return c.json({
+      success: true,
+      message: 'Holdings repaired successfully',
+      snapshotsFound: latestSnapshots.results.length,
+      holdingsCreated: holdingsCreated
+    })
+    
+  } catch (error) {
+    console.error('💥 Error repairing holdings:', error)
+    return c.json({ error: 'Failed to repair holdings: ' + error.message }, 500)
+  }
 })
 
 // Force regenerate snapshots for September 18
@@ -2574,6 +2836,79 @@ async function updateHoldings(db, assetSymbol) {
   }
 }
 
+// Get single transaction for editing
+app.get('/api/transactions/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    
+    const transaction = await c.env.DB.prepare(`
+      SELECT * FROM transactions 
+      WHERE id = ?
+    `).bind(id).first()
+    
+    if (!transaction) {
+      return c.json({ error: 'Transaction not found' }, 404)
+    }
+
+    return c.json(transaction)
+  } catch (error) {
+    console.error('Error fetching transaction:', error)
+    return c.json({ error: 'Error fetching transaction' }, 500)
+  }
+})
+
+// Update transaction
+app.put('/api/transactions/:id', async (c) => {
+  try {
+    const id = c.req.param('id')
+    const {
+      transaction_date,
+      exchange,
+      quantity,
+      price_per_unit,
+      total_amount,
+      notes
+    } = await c.req.json()
+    
+    // Get original transaction to get asset_symbol
+    const originalTransaction = await c.env.DB.prepare('SELECT * FROM transactions WHERE id = ?').bind(id).first()
+    
+    if (!originalTransaction) {
+      return c.json({ error: 'Transaction not found' }, 404)
+    }
+
+    // Update transaction
+    await c.env.DB.prepare(`
+      UPDATE transactions 
+      SET transaction_date = ?, 
+          exchange = ?, 
+          quantity = ?, 
+          price_per_unit = ?, 
+          total_amount = ?, 
+          notes = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).bind(
+      transaction_date,
+      exchange,
+      quantity,
+      price_per_unit,
+      total_amount,
+      notes || null,
+      new Date().toISOString(),
+      id
+    ).run()
+    
+    // Update holdings for this asset
+    await updateHoldings(c.env.DB, originalTransaction.asset_symbol)
+
+    return c.json({ success: true, message: 'Transacción actualizada correctamente' })
+  } catch (error) {
+    console.error('Error updating transaction:', error)
+    return c.json({ error: 'Error updating transaction' }, 500)
+  }
+})
+
 // ============================================
 // TRANSACTIONS PAGE
 // ============================================
@@ -2643,6 +2978,10 @@ app.get('/transactions', (c) => {
                             <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-chart-area mr-2"></i>
                                 Markets
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
                             </a>
                         </nav>
                     </div>
@@ -2970,6 +3309,74 @@ app.get('/transactions', (c) => {
             </div>
         </div>
 
+        <!-- Modal de Edición de Transacción -->
+        <div id="editTransactionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+            <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-90vh overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-900">Editar Transacción</h3>
+                    <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form id="editTransactionForm" class="space-y-6">
+                    <input type="hidden" id="editTransactionId">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Fecha y Hora</label>
+                            <input type="datetime-local" id="editTransactionDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Exchange</label>
+                            <select id="editExchange" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                                <option value="">Seleccionar exchange</option>
+                                <option value="Bitso">Bitso</option>
+                                <option value="Binance">Binance</option>
+                                <option value="Etoro">Etoro</option>
+                                <option value="Lbank">Lbank</option>
+                                <option value="Metamask">Metamask</option>
+                                <option value="Bybit">Bybit</option>
+                                <option value="Dexscreener">Dexscreener</option>
+                                <option value="Ledger">Ledger</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad</label>
+                            <input type="number" id="editQuantity" step="0.00000001" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Precio por Unidad</label>
+                            <input type="number" id="editPricePerUnit" step="0.00000001" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Total</label>
+                            <input type="number" id="editTotalAmount" step="0.00000001" class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-900" readonly>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+                            <textarea id="editNotes" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" placeholder="Notas adicionales sobre la transacción..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4 pt-6 border-t">
+                        <button type="button" onclick="closeEditModal()" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                            <i class="fas fa-save mr-2"></i>
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script>
             // Global variables
             let selectedAssetData = null;
@@ -3265,7 +3672,7 @@ app.get('/transactions', (c) => {
                 const pricePerUnit = parseFloat(document.getElementById('pricePerUnit').value) || 0;
                 const total = quantity * pricePerUnit;
                 
-                document.getElementById('totalAmount').value = total.toFixed(2);
+                document.getElementById('totalAmount').value = total.toFixed(8);
             }
 
             // Handle form submission
@@ -3446,9 +3853,14 @@ app.get('/transactions', (c) => {
                                     <td class="px-4 py-3 text-sm executive-text-primary">$\${parseFloat(tx.price_per_unit).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                                     <td class="px-4 py-3 text-sm executive-text-primary">$\${parseFloat(tx.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                                     <td class="px-4 py-3">
-                                        <button onclick="deleteTransaction(\${tx.id})" class="text-red-600 hover:text-red-800 text-sm">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
+                                        <div class="flex space-x-2">
+                                            <button onclick="editTransaction(\${tx.id})" class="text-blue-600 hover:text-blue-800 text-sm" title="Editar transacción">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button onclick="deleteTransaction(\${tx.id})" class="text-red-600 hover:text-red-800 text-sm" title="Eliminar transacción">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             \`).join('')}
@@ -3477,6 +3889,85 @@ app.get('/transactions', (c) => {
                     alert('Error eliminando transacción');
                 }
             }
+
+            // Make function globally accessible
+            window.deleteTransaction = deleteTransaction;
+
+            // Edit transaction functions
+            async function editTransaction(id) {
+                try {
+                    // Get transaction data
+                    const response = await axios.get('/api/transactions/' + id);
+                    const transaction = response.data;
+                    
+                    // Populate modal fields
+                    document.getElementById('editTransactionId').value = transaction.id;
+                    document.getElementById('editTransactionDate').value = new Date(transaction.transaction_date).toISOString().slice(0, 16);
+                    document.getElementById('editExchange').value = transaction.exchange;
+                    document.getElementById('editQuantity').value = transaction.quantity;
+                    document.getElementById('editPricePerUnit').value = transaction.price_per_unit;
+                    document.getElementById('editTotalAmount').value = transaction.total_amount;
+                    document.getElementById('editNotes').value = transaction.notes || '';
+                    
+                    // Setup auto-calculation for edit form
+                    document.getElementById('editQuantity').addEventListener('input', calculateEditTotal);
+                    document.getElementById('editPricePerUnit').addEventListener('input', calculateEditTotal);
+                    
+                    // Show modal
+                    document.getElementById('editTransactionModal').classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('Error loading transaction:', error);
+                    alert('Error cargando datos de la transacción');
+                }
+            }
+
+            // Make function globally accessible
+            window.editTransaction = editTransaction;
+
+            function calculateEditTotal() {
+                const quantity = parseFloat(document.getElementById('editQuantity').value) || 0;
+                const price = parseFloat(document.getElementById('editPricePerUnit').value) || 0;
+                const total = quantity * price;
+                document.getElementById('editTotalAmount').value = total.toFixed(8);
+            }
+
+            function closeEditModal() {
+                document.getElementById('editTransactionModal').classList.add('hidden');
+                document.getElementById('editTransactionForm').reset();
+            }
+
+            // Handle edit form submission
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('editTransactionForm').addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const id = document.getElementById('editTransactionId').value;
+                    const formData = {
+                        transaction_date: document.getElementById('editTransactionDate').value,
+                        exchange: document.getElementById('editExchange').value,
+                        quantity: parseFloat(document.getElementById('editQuantity').value),
+                        price_per_unit: parseFloat(document.getElementById('editPricePerUnit').value),
+                        total_amount: parseFloat(document.getElementById('editTotalAmount').value),
+                        notes: document.getElementById('editNotes').value
+                    };
+                    
+                    try {
+                        const response = await axios.put('/api/transactions/' + id, formData);
+                        
+                        if (response.data.success) {
+                            alert('Transacción actualizada exitosamente');
+                            closeEditModal();
+                            loadTransactions();
+                        } else {
+                            alert('Error: ' + response.data.error);
+                        }
+                    } catch (error) {
+                        console.error('Error updating transaction:', error);
+                        alert('Error actualizando la transacción');
+                    }
+                });
+            });
 
             // Show search loading state
             function showSearchLoading(type = 'single') {
@@ -3665,7 +4156,7 @@ app.get('/transactions', (c) => {
 
                 const dateTime = formattedDate.split(' ');
                 const assetName = tx.asset_name || 'N/A';
-                const formattedQuantity = tx.quantity.toLocaleString('es-ES', { maximumFractionDigits: 8 });
+                const formattedQuantity = parseFloat(tx.quantity).toFixed(8);
                 const formattedPrice = tx.price_per_unit.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const formattedTotal = tx.total_amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const formattedFees = tx.fees > 0 ? '$' + tx.fees.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
@@ -3711,11 +4202,11 @@ app.get('/transactions', (c) => {
                         formattedFees +
                     '</td>' +
                     '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">' +
-                        '<button onclick="event.stopPropagation(); exportTransaction(' + tx.id + ')" class="text-blue-600 hover:text-blue-900 mr-3">' +
-                            '<i class="fas fa-download"></i>' +
+                        '<button onclick="event.stopPropagation(); editTransaction(' + tx.id + ')" class="text-blue-600 hover:text-blue-900 mr-3" title="Editar transacción">' +
+                            '<i class="fas fa-edit"></i>' +
                         '</button>' +
-                        '<button onclick="event.stopPropagation(); showTransactionDetails(' + tx.id + ')" class="text-gray-600 hover:text-gray-900">' +
-                            '<i class="fas fa-eye"></i>' +
+                        '<button onclick="event.stopPropagation(); deleteTransaction(' + tx.id + ')" class="text-red-600 hover:text-red-900" title="Eliminar transacción">' +
+                            '<i class="fas fa-trash"></i>' +
                         '</button>' +
                     '</td>' +
                 '</tr>';
@@ -4575,11 +5066,19 @@ app.get('/import', (c) => {
                             </a>
                             <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-briefcase mr-2"></i>
-                                Portafolio
+                                Portfolio
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg bg-slate-700 bg-opacity-50 text-white transition-all font-medium text-sm">
+                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-upload mr-2"></i>
                                 Importar
+                            </a>
+                            <a href="/prices" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
+                                <i class="fas fa-chart-area mr-2"></i>
+                                Markets
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
                             </a>
                         </nav>
                     </div>
@@ -4695,7 +5194,7 @@ app.get('/import', (c) => {
                 </div>
 
                 <!-- Import Options -->
-                <div id="importOptions" class="hidden mb-8">
+                <div id="importOptions" class="mb-8">
                     <h3 class="text-xl font-medium executive-text-primary mb-4">
                         <i class="fas fa-cogs mr-2"></i>
                         Opciones de Importación
@@ -5217,11 +5716,60 @@ app.post('/api/import/daily-snapshots', async (c) => {
       assets: assetsProcessed.size 
     })
 
+    // CRITICAL: Create holdings from latest daily snapshots
+    console.log('🔄 Creating holdings from imported daily snapshots...')
+    
+    // Get latest snapshot for each asset
+    const latestSnapshots = await DB.prepare(`
+      SELECT 
+        asset_symbol,
+        quantity,
+        price_per_unit,
+        total_value,
+        MAX(snapshot_date) as latest_date
+      FROM daily_snapshots 
+      GROUP BY asset_symbol
+    `).all()
+    
+    console.log('📊 Latest snapshots found:', latestSnapshots.results.length)
+    
+    // Create holdings for each asset
+    for (const snapshot of latestSnapshots.results) {
+      try {
+        await DB.prepare(`
+          INSERT OR REPLACE INTO holdings (
+            asset_symbol, 
+            quantity, 
+            avg_purchase_price,
+            total_invested,
+            current_value,
+            unrealized_pnl,
+            last_updated
+          ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+        `).bind(
+          snapshot.asset_symbol,
+          snapshot.quantity,
+          snapshot.price_per_unit,
+          snapshot.total_value, // Using total_value as invested
+          snapshot.total_value, // Current value same as total
+          0, // PnL calculation can be done later
+        ).run()
+        
+        console.log(`✅ Holding created: ${snapshot.asset_symbol} - ${snapshot.quantity} @ $${snapshot.price_per_unit}`)
+        
+      } catch (holdingError) {
+        console.error('❌ Error creating holding:', snapshot.asset_symbol, holdingError)
+      }
+    }
+    
+    console.log('🎉 Holdings creation completed!')
+
     return c.json({ 
       success: true,
       imported: importedCount,
       skipped: skippedCount,
       assets: assetsProcessed.size,
+      holdingsCreated: latestSnapshots.results.length,
       dataCleared: options.clearExisting,
       message: options.clearExisting ? 
         'All existing data cleared and new data imported successfully' : 
@@ -5448,6 +5996,74 @@ app.get('/asset/:symbol', (c) => {
             </div>
         </div>
 
+        <!-- Modal de Edición de Transacción -->
+        <div id="editTransactionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+            <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-90vh overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-900">Editar Transacción</h3>
+                    <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form id="editTransactionForm" class="space-y-6">
+                    <input type="hidden" id="editTransactionId">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Fecha y Hora</label>
+                            <input type="datetime-local" id="editTransactionDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Exchange</label>
+                            <select id="editExchange" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                                <option value="">Seleccionar exchange</option>
+                                <option value="Bitso">Bitso</option>
+                                <option value="Binance">Binance</option>
+                                <option value="Etoro">Etoro</option>
+                                <option value="Lbank">Lbank</option>
+                                <option value="Metamask">Metamask</option>
+                                <option value="Bybit">Bybit</option>
+                                <option value="Dexscreener">Dexscreener</option>
+                                <option value="Ledger">Ledger</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cantidad</label>
+                            <input type="number" id="editQuantity" step="0.00000001" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Precio por Unidad</label>
+                            <input type="number" id="editPricePerUnit" step="0.00000001" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" required>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Total</label>
+                            <input type="number" id="editTotalAmount" step="0.00000001" class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-900" readonly>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+                            <textarea id="editNotes" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white" placeholder="Notas adicionales sobre la transacción..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4 pt-6 border-t">
+                        <button type="button" onclick="closeEditModal()" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                            <i class="fas fa-save mr-2"></i>
+                            Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <script>
             // Asset symbol from URL
             const assetSymbol = '${symbol}';
@@ -5460,7 +6076,107 @@ app.get('/asset/:symbol', (c) => {
             // Load asset data on page load
             document.addEventListener('DOMContentLoaded', function() {
                 loadAssetDetails();
+                
+
             });
+            
+            // FUNCIÓN SIMPLE Y LIMPIA PARA CARGAR HISTORIAL DIARIO
+            async function loadDailyHistory() {
+                try {
+                    console.log('📊 Cargando historial diario...');
+                    
+                    // Obtener datos del API
+                    const response = await axios.get('/api/wallet/asset/' + assetSymbol);
+                    const snapshots = response.data.daily_snapshots || [];
+                    
+                    if (snapshots.length === 0) {
+                        document.getElementById('daily-history-table').innerHTML = '<p class="text-center text-gray-500 p-8">No hay datos de historial disponibles</p>';
+                        return;
+                    }
+                    
+                    // Ordenar por fecha descendente (más reciente primero)
+                    const sortedData = snapshots.sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date));
+                    
+                    console.log('✅ Datos ordenados:', sortedData.length, 'registros');
+                    
+                    // Crear tabla HTML
+                    let html = '<table class="min-w-full">';
+                    html += '<thead class="bg-slate-100">';
+                    html += '<tr>';
+                    html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">FECHA</th>';
+                    html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">CANTIDAD</th>';
+                    html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">PRECIO (9 PM)</th>';
+                    html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">VALOR TOTAL</th>';
+                    html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">PNL DIARIO</th>';
+                    html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">% CAMBIO</th>';
+                    html += '</tr>';
+                    html += '</thead>';
+                    html += '<tbody>';
+                    
+                    // Procesar cada fila
+                    for (let i = 0; i < sortedData.length; i++) {
+                        const row = sortedData[i];
+                        const date = new Date(row.snapshot_date);
+                        const fecha = date.toLocaleDateString('es-ES', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                        });
+                        
+                        const cantidad = parseFloat(row.quantity);
+                        const precio = parseFloat(row.price_per_unit);
+                        const valorHoy = parseFloat(row.total_value);
+                        
+                        // CALCULAR PNL DIARIO: HOY - AYER
+                        let pnlTexto = '-';
+                        let porcentajeTexto = '-';
+                        let colorStyle = 'color: #6b7280;';
+                        
+                        if (i < sortedData.length - 1) {
+                            const valorAyer = parseFloat(sortedData[i + 1].total_value);
+                            const pnlDiario = valorHoy - valorAyer;
+                            const porcentajeCambio = valorAyer > 0 ? (pnlDiario / valorAyer) * 100 : 0;
+                            
+                            console.log(fecha + ': $' + valorHoy.toFixed(2) + ' - $' + valorAyer.toFixed(2) + ' = $' + pnlDiario.toFixed(2));
+                            
+                            if (pnlDiario > 0) {
+                                colorStyle = 'color: #16a34a; font-weight: bold;';
+                                pnlTexto = '↑ $' + pnlDiario.toLocaleString('en-US', {minimumFractionDigits: 2});
+                                porcentajeTexto = '↑ ' + porcentajeCambio.toFixed(2) + '%';
+                            } else if (pnlDiario < 0) {
+                                colorStyle = 'color: #dc2626; font-weight: bold;';
+                                pnlTexto = '↓ $' + Math.abs(pnlDiario).toLocaleString('en-US', {minimumFractionDigits: 2});
+                                porcentajeTexto = '↓ ' + Math.abs(porcentajeCambio).toFixed(2) + '%';
+                            } else {
+                                pnlTexto = '$0.00';
+                                porcentajeTexto = '0.00%';
+                            }
+                        }
+                        
+                        const bgClass = i % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+                        
+                        html += '<tr class="' + bgClass + '">';
+                        html += '<td class="px-4 py-3 text-sm text-slate-800">' + fecha + '</td>';
+                        html += '<td class="px-4 py-3 text-sm text-slate-800">' + cantidad.toFixed(8) + '</td>';
+                        html += '<td class="px-4 py-3 text-sm text-slate-900">$' + precio.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</td>';
+                        html += '<td class="px-4 py-3 text-sm text-slate-900 font-semibold">$' + valorHoy.toLocaleString('en-US', {minimumFractionDigits: 2}) + '</td>';
+                        html += '<td class="px-4 py-3 text-sm" style="' + colorStyle + '">' + pnlTexto + '</td>';
+                        html += '<td class="px-4 py-3 text-sm" style="' + colorStyle + '">' + porcentajeTexto + '</td>';
+                        html += '</tr>';
+                    }
+                    
+                    html += '</tbody></table>';
+                    
+                    // Insertar tabla en el DOM
+                    document.getElementById('daily-history-table').innerHTML = html;
+                    console.log('🎉 Tabla de historial diario cargada correctamente');
+                    
+                } catch (error) {
+                    console.error('❌ Error cargando historial diario:', error);
+                    document.getElementById('daily-history-table').innerHTML = '<p class="text-center text-red-500 p-8">Error cargando historial diario</p>';
+                }
+            }
 
             // Load all asset details
             async function loadAssetDetails() {
@@ -5672,8 +6388,7 @@ app.get('/asset/:symbol', (c) => {
                     const fees = parseFloat(tx.fees || 0);
                     
                     html += \`
-                        <div class="transaction-item cursor-pointer p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 hover:bg-opacity-30 transition-all duration-200" 
-                             onclick="showTransactionDetails(\${tx.id})">
+                        <div class="transaction-item p-4 border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 hover:bg-opacity-30 transition-all duration-200">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-4">
                                     <div class="w-12 h-12 rounded-full flex items-center justify-center border-2 \${typeClass}">
@@ -5686,7 +6401,7 @@ app.get('/asset/:symbol', (c) => {
                                         </div>
                                         <div class="flex items-center space-x-4 mt-1">
                                             <p class="text-sm text-slate-600">\${formattedDate} • \${formattedTime}</p>
-                                            <p class="text-sm text-slate-600">\${quantity.toLocaleString()} unidades</p>
+                                            <p class="text-sm text-slate-600">\${quantity.toFixed(8)} unidades</p>
                                         </div>
                                     </div>
                                 </div>
@@ -5696,8 +6411,18 @@ app.get('/asset/:symbol', (c) => {
                                     \${fees > 0 ? \`<p class="text-xs text-slate-500 mt-1">Comisión: $\${fees.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>\` : ''}
                                 </div>
                             </div>
-                            <div class="flex items-center justify-center mt-3 text-blue-600">
-                                <i class="fas fa-chevron-right text-sm"></i>
+                            <div class="flex items-center justify-between mt-3">
+                                <div class="flex space-x-3">
+                                    <button onclick="event.stopPropagation(); editTransaction(\${tx.id})" class="text-blue-600 hover:text-blue-800 text-sm px-3 py-1 rounded-md border border-blue-300 hover:bg-blue-50 transition-colors" title="Editar transacción">
+                                        <i class="fas fa-edit mr-1"></i>Editar
+                                    </button>
+                                    <button onclick="event.stopPropagation(); deleteTransaction(\${tx.id})" class="text-red-600 hover:text-red-800 text-sm px-3 py-1 rounded-md border border-red-300 hover:bg-red-50 transition-colors" title="Eliminar transacción">
+                                        <i class="fas fa-trash mr-1"></i>Borrar
+                                    </button>
+                                </div>
+                                <div class="text-blue-600" onclick="showTransactionDetails(\${tx.id})">
+                                    <i class="fas fa-chevron-right text-sm"></i>
+                                </div>
                             </div>
                         </div>
                     \`;
@@ -5766,7 +6491,7 @@ app.get('/asset/:symbol', (c) => {
                             
                             <div class="bg-slate-50 p-3 rounded-lg">
                                 <p class="text-slate-600 font-medium mb-1">Cantidad</p>
-                                <p class="font-semibold">\${quantity.toLocaleString()} unidades</p>
+                                <p class="font-semibold">\${quantity.toFixed(8)} unidades</p>
                             </div>
                             
                             <div class="bg-slate-50 p-3 rounded-lg">
@@ -5807,6 +6532,9 @@ app.get('/asset/:symbol', (c) => {
                 document.getElementById('modal-transaction-details').innerHTML = modalContent;
                 document.getElementById('transaction-modal').classList.remove('hidden');
             }
+
+            // Make function globally accessible
+            window.showTransactionDetails = showTransactionDetails;
 
             // Close transaction modal
             function closeTransactionModal() {
@@ -5851,6 +6579,9 @@ app.get('/asset/:symbol', (c) => {
                 showError('Transacción exportada exitosamente');
             }
 
+            // Make function globally accessible
+            window.exportTransaction = exportTransaction;
+
             // Global variables for history table
             let dailyHistoryData = [];
             let showAllHistory = true; // Show all by default
@@ -5858,112 +6589,116 @@ app.get('/asset/:symbol', (c) => {
             // Load daily history
             async function loadDailyHistory() {
                 try {
-                    const response = await axios.get(\`/api/wallet/asset/\${assetSymbol}\`);
+                    console.log('🔥 FUNCIÓN COMPLETAMENTE NUEVA - DESDE CERO');
+                    
+                    // Obtener datos frescos
+                    const response = await axios.get(\`/api/wallet/asset/\${assetSymbol}?_=\${Date.now()}\`);
                     const snapshots = response.data.daily_snapshots || [];
                     
-                    // Sort by date descending (most recent first)
-                    dailyHistoryData = snapshots.sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date));
+                    console.log('📊 Datos brutos recibidos:', snapshots.length);
                     
-                    console.log('Daily history loaded:', dailyHistoryData.length, 'records');
-                    displayDailyHistory();
+                    // Ordenar por fecha descendente (más reciente primero)
+                    const sortedData = snapshots.sort((a, b) => new Date(b.snapshot_date) - new Date(a.snapshot_date));
+                    
+                    console.log('📋 Primeros 5 datos ordenados:');
+                    sortedData.slice(0, 5).forEach((item, i) => {
+                        console.log(\`  \${i}: \${item.snapshot_date} = $\${parseFloat(item.total_value).toFixed(2)}\`);
+                    });
+                    
+                    // CREAR TABLA COMPLETAMENTE NUEVA
+                    createNewTable(sortedData);
                     
                 } catch (error) {
-                    console.error('Error loading daily history:', error);
-                    document.getElementById('daily-history-table').innerHTML = '<p class="text-red-500 text-center py-8">Error cargando historial diario</p>';
+                    console.error('❌ Error:', error);
                 }
             }
-
-            // Display daily history table (Excel-like)
-            function displayDailyHistory() {
-                const container = document.getElementById('daily-history-table');
+            
+            // FUNCIÓN COMPLETAMENTE NUEVA PARA CREAR LA TABLA
+            function createNewTable(data) {
+                console.log('🛠️ CREANDO TABLA COMPLETAMENTE NUEVA');
                 
-                if (!dailyHistoryData || dailyHistoryData.length === 0) {
-                    container.innerHTML = '<p class="text-slate-500 text-center py-8">No hay historial disponible</p>';
+                const container = document.getElementById('daily-history-table');
+                if (!container) {
+                    console.error('❌ No se encontró el container');
                     return;
                 }
                 
-                // Show all records by default (like the original)
-                const displayData = dailyHistoryData;
+                let html = '<table class="min-w-full">';
+                html += '<thead class="bg-slate-100 border-b border-slate-200">';
+                html += '<tr>';
+                html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">FECHA</th>';
+                html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">CANTIDAD</th>';
+                html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">PRECIO (9 PM)</th>';
+                html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">VALOR TOTAL</th>';
+                html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">PNL DIARIO</th>';
+                html += '<th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">% CAMBIO</th>';
+                html += '</tr>';
+                html += '</thead>';
+                html += '<tbody class="bg-white">';
                 
-                let html = \`
-                    <table class="min-w-full">
-                        <thead class="bg-slate-100 border-b border-slate-200">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">FECHA</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">CANTIDAD</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">PRECIO (9 PM)</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">VALOR TOTAL</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">PNL</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">% CAMBIO</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white">
-                \`;
-                
-                displayData.forEach((record, index) => {
-                    const date = new Date(record.snapshot_date);
-                    const formattedDate = date.toLocaleDateString('es-ES', {
+                // PROCESAR CADA FILA CON CÁLCULO CORRECTO
+                for (let i = 0; i < data.length; i++) {
+                    const row = data[i];
+                    const date = new Date(row.snapshot_date);
+                    const fecha = date.toLocaleDateString('es-ES', {
                         weekday: 'short',
-                        day: 'numeric',
+                        day: 'numeric', 
                         month: 'short',
                         year: 'numeric'
                     });
                     
-                    const quantity = parseFloat(record.quantity);
-                    const pricePerUnit = parseFloat(record.price_per_unit);
-                    const totalValue = parseFloat(record.total_value);
-                    const pnl = parseFloat(record.unrealized_pnl);
+                    const cantidad = parseFloat(row.quantity);
+                    const precio = parseFloat(row.price_per_unit);
+                    const valorHoy = parseFloat(row.total_value);
                     
-                    // Calculate percentage change from previous day (chronologically)
-                    // Since data is sorted descending (newest first), we compare with next item in array
-                    let percentChange = 0;
-                    let changeClass = 'text-slate-600';
-                    let changeIcon = '';
+                    // CÁLCULO DEL CAMBIO DIARIO
+                    let pnlDiario = 0;
+                    let porcentajeCambio = 0;
+                    let pnlColor = '#6b7280';
+                    let pnlTexto = '-';
+                    let porcentajeTexto = '-';
                     
-                    if (index < displayData.length - 1) {
-                        const previousDayValue = parseFloat(displayData[index + 1].total_value);
-                        if (previousDayValue && previousDayValue !== 0) {
-                            percentChange = ((totalValue - previousDayValue) / previousDayValue) * 100;
-                            if (percentChange > 0) {
-                                changeClass = 'text-green-600';
-                                changeIcon = '↑ ';
-                            } else if (percentChange < 0) {
-                                changeClass = 'text-red-600';
-                                changeIcon = '↓ ';
-                            }
+                    if (i < data.length - 1) {
+                        const valorAyer = parseFloat(data[i + 1].total_value);
+                        pnlDiario = valorHoy - valorAyer;
+                        porcentajeCambio = valorAyer > 0 ? (pnlDiario / valorAyer) * 100 : 0;
+                        
+                        console.log(\`🧮 \${fecha}: $\${valorHoy.toFixed(2)} - $\${valorAyer.toFixed(2)} = $\${pnlDiario.toFixed(2)} (\${porcentajeCambio.toFixed(2)}%)\`);
+                        
+                        if (pnlDiario > 0) {
+                            pnlColor = '#16a34a';
+                            pnlTexto = '↑ $' + pnlDiario.toLocaleString('en-US', {minimumFractionDigits: 2});
+                            porcentajeTexto = '↑ ' + porcentajeCambio.toFixed(2) + '%';
+                        } else if (pnlDiario < 0) {
+                            pnlColor = '#dc2626';
+                            pnlTexto = '↓ $' + Math.abs(pnlDiario).toLocaleString('en-US', {minimumFractionDigits: 2});
+                            porcentajeTexto = '↓ ' + Math.abs(porcentajeCambio).toFixed(2) + '%';
+                        } else {
+                            pnlTexto = '$0.00';
+                            porcentajeTexto = '0.00%';
                         }
                     }
                     
-                    const pnlClass = pnl >= 0 ? 'text-green-600' : 'text-red-600';
-                    const pnlIcon = pnl >= 0 ? '↑ $' : '↓ $';
+                    const rowClass = i % 2 === 0 ? 'bg-white' : 'bg-slate-50';
                     
-                    // Format numbers like in the image
-                    const formattedPrice = '$' + pricePerUnit.toLocaleString('en-US', {minimumFractionDigits: 3});
-                    const formattedTotal = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 3});
-                    const formattedPnl = pnlIcon + Math.abs(pnl).toLocaleString('en-US', {minimumFractionDigits: 3});
-                    const formattedChange = changeIcon + Math.abs(percentChange).toFixed(2) + '%';
-                    
-                    const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
-                    
-                    html += \`
-                        <tr class="\${rowClass} hover:bg-slate-100 transition-colors border-b border-slate-100">
-                            <td class="px-4 py-3 text-sm text-slate-800">\${formattedDate}</td>
-                            <td class="px-4 py-3 text-sm text-slate-800">\${quantity}</td>
-                            <td class="px-4 py-3 text-sm text-slate-900 font-medium">\${formattedPrice}</td>
-                            <td class="px-4 py-3 text-sm text-slate-900 font-semibold">\${formattedTotal}</td>
-                            <td class="px-4 py-3 text-sm \${pnlClass} font-medium">\${formattedPnl}</td>
-                            <td class="px-4 py-3 text-sm \${changeClass} font-medium">\${formattedChange}</td>
-                        </tr>
-                    \`;
-                });
+                    html += '<tr class="' + rowClass + ' border-b border-slate-100">';
+                    html += '<td class="px-4 py-3 text-sm text-slate-800">' + fecha + '</td>';
+                    html += '<td class="px-4 py-3 text-sm text-slate-800">' + cantidad.toFixed(8) + '</td>';
+                    html += '<td class="px-4 py-3 text-sm text-slate-900">$' + precio.toLocaleString('en-US', {minimumFractionDigits: 3}) + '</td>';
+                    html += '<td class="px-4 py-3 text-sm text-slate-900 font-semibold">$' + valorHoy.toLocaleString('en-US', {minimumFractionDigits: 3}) + '</td>';
+                    html += '<td class="px-4 py-3 text-sm font-bold" style="color: ' + pnlColor + ';">' + pnlTexto + '</td>';
+                    html += '<td class="px-4 py-3 text-sm font-bold" style="color: ' + pnlColor + ';">' + porcentajeTexto + '</td>';
+                    html += '</tr>';
+                }
                 
-                html += \`
-                        </tbody>
-                    </table>
-                \`;
+                html += '</tbody></table>';
                 
+                console.log('✅ INSERTANDO NUEVA TABLA');
                 container.innerHTML = html;
+                console.log('🎉 TABLA NUEVA COMPLETADA');
             }
+
+
 
 
 
@@ -6015,6 +6750,104 @@ app.get('/asset/:symbol', (c) => {
                     errorDiv.remove();
                 }, 3000);
             }
+
+            // Edit transaction functions for asset detail page
+            async function editTransaction(id) {
+                try {
+                    // Get transaction data
+                    const response = await axios.get('/api/transactions/' + id);
+                    const transaction = response.data;
+                    
+                    // Populate modal fields
+                    document.getElementById('editTransactionId').value = transaction.id;
+                    document.getElementById('editTransactionDate').value = new Date(transaction.transaction_date).toISOString().slice(0, 16);
+                    document.getElementById('editExchange').value = transaction.exchange;
+                    document.getElementById('editQuantity').value = transaction.quantity;
+                    document.getElementById('editPricePerUnit').value = transaction.price_per_unit;
+                    document.getElementById('editTotalAmount').value = transaction.total_amount;
+                    document.getElementById('editNotes').value = transaction.notes || '';
+                    
+                    // Setup auto-calculation for edit form
+                    document.getElementById('editQuantity').addEventListener('input', calculateEditTotal);
+                    document.getElementById('editPricePerUnit').addEventListener('input', calculateEditTotal);
+                    
+                    // Show modal
+                    document.getElementById('editTransactionModal').classList.remove('hidden');
+                    
+                } catch (error) {
+                    console.error('Error loading transaction:', error);
+                    showError('Error cargando datos de la transacción');
+                }
+            }
+
+            function calculateEditTotal() {
+                const quantity = parseFloat(document.getElementById('editQuantity').value) || 0;
+                const price = parseFloat(document.getElementById('editPricePerUnit').value) || 0;
+                const total = quantity * price;
+                document.getElementById('editTotalAmount').value = total.toFixed(8);
+            }
+
+            function closeEditModal() {
+                document.getElementById('editTransactionModal').classList.add('hidden');
+                document.getElementById('editTransactionForm').reset();
+            }
+
+            // Delete transaction function
+            async function deleteTransaction(id) {
+                if (!confirm('¿Estás seguro de eliminar esta transacción?')) return;
+                
+                try {
+                    const response = await axios.delete('/api/transactions/' + id);
+                    
+                    if (response.data.success) {
+                        showError('Transacción eliminada exitosamente');
+                        // Reload transaction history and asset details
+                        loadTransactionHistory();
+                        loadAssetDetails();
+                    } else {
+                        showError('Error eliminando transacción');
+                    }
+                } catch (error) {
+                    console.error('Error deleting transaction:', error);
+                    showError('Error eliminando transacción');
+                }
+            }
+
+            // Handle edit form submission
+            document.addEventListener('DOMContentLoaded', function() {
+                if (document.getElementById('editTransactionForm')) {
+                    document.getElementById('editTransactionForm').addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        
+                        const id = document.getElementById('editTransactionId').value;
+                        const formData = {
+                            transaction_date: document.getElementById('editTransactionDate').value,
+                            exchange: document.getElementById('editExchange').value,
+                            quantity: parseFloat(document.getElementById('editQuantity').value),
+                            price_per_unit: parseFloat(document.getElementById('editPricePerUnit').value),
+                            total_amount: parseFloat(document.getElementById('editTotalAmount').value),
+                            notes: document.getElementById('editNotes').value
+                        };
+                        
+                        try {
+                            const response = await axios.put('/api/transactions/' + id, formData);
+                            
+                            if (response.data.success) {
+                                showError('Transacción actualizada exitosamente');
+                                closeEditModal();
+                                // Reload transaction history and asset details
+                                loadTransactionHistory();
+                                loadAssetDetails();
+                            } else {
+                                showError('Error: ' + response.data.error);
+                            }
+                        } catch (error) {
+                            console.error('Error updating transaction:', error);
+                            showError('Error actualizando la transacción');
+                        }
+                    });
+                }
+            });
         </script>
     </body>
     </html>
@@ -6079,9 +6912,17 @@ app.get('/wallet', (c) => {
                                 <i class="fas fa-briefcase mr-2"></i>
                                 Portfolio
                             </a>
+                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-upload mr-2"></i>
+                                Importar
+                            </a>
                             <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-chart-area mr-2"></i>
                                 Markets
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
                             </a>
                         </nav>
                     </div>
@@ -8264,6 +9105,289 @@ app.get('/api/admin/snapshot-status', async (c) => {
   }
 })
 
+// TEMPORARY ENDPOINT: Fix BTC snapshot price for Sept 20, 2025
+app.post('/api/fix-btc-snapshot', async (c) => {
+  try {
+    console.log('🔧 Fixing BTC snapshot for 2025-09-20 with real price: $115,732.59')
+    
+    const result = await c.env.DB.prepare(`
+      UPDATE daily_snapshots 
+      SET 
+        price_per_unit = 115732.59,
+        total_value = 208711.25,
+        unrealized_pnl = 2568.92
+      WHERE asset_symbol = 'BTC' AND snapshot_date = '2025-09-20'
+    `).run()
+    
+    return c.json({
+      success: true,
+      message: 'BTC snapshot fixed with real price',
+      changes: result.changes,
+      details: {
+        date: '2025-09-20',
+        old_price: 115765,
+        new_price: 115732.59,
+        new_total_value: 208711.25,
+        new_pnl: 2568.92
+      }
+    })
+  } catch (error) {
+    console.error('Error fixing BTC snapshot:', error)
+    return c.json({ error: 'Failed to fix BTC snapshot' }, 500)
+  }
+})
+
+// TEMPORARY ENDPOINT: Delete incorrect future snapshot for Sept 21, 2025
+app.post('/api/delete-future-snapshot', async (c) => {
+  try {
+    console.log('🗑️ Deleting incorrect snapshot for 2025-09-21 (future date)')
+    
+    const result = await c.env.DB.prepare(`
+      DELETE FROM daily_snapshots 
+      WHERE asset_symbol = 'BTC' AND snapshot_date = '2025-09-21'
+    `).run()
+    
+    return c.json({
+      success: true,
+      message: 'Future snapshot deleted',
+      changes: result.changes,
+      deleted_date: '2025-09-21'
+    })
+  } catch (error) {
+    console.error('Error deleting future snapshot:', error)
+    return c.json({ error: 'Failed to delete future snapshot' }, 500)
+  }
+})
+
+// ============================================
+// CSV/EXCEL IMPORT FUNCTIONALITY 
+// ============================================
+
+// Import CSV and replace daily snapshots (preserving transactions)
+app.post('/api/import/csv', async (c) => {
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('csv_file') as File
+    
+    if (!file) {
+      return c.json({ 
+        success: false, 
+        error: 'No se encontró archivo CSV' 
+      }, 400)
+    }
+
+    // Read CSV content
+    const csvContent = await file.text()
+    const lines = csvContent.split('\n').filter(line => line.trim())
+    
+    if (lines.length < 2) {
+      return c.json({ 
+        success: false, 
+        error: 'El archivo CSV debe contener al menos una fila de datos' 
+      }, 400)
+    }
+
+    // Parse header
+    const headers = lines[0].split(',').map(h => h.trim())
+    console.log('CSV Headers:', headers)
+
+    // Expected format: FECHA,MONEDA,TOTAL Cantidad,Precio final 9 PM,Valor USD
+    const requiredColumns = ['FECHA', 'MONEDA', 'TOTAL Cantidad', 'Precio final 9 PM', 'Valor USD']
+    const missingColumns = requiredColumns.filter(col => !headers.includes(col))
+    
+    if (missingColumns.length > 0) {
+      return c.json({
+        success: false,
+        error: `Columnas faltantes en CSV: ${missingColumns.join(', ')}`,
+        expected: requiredColumns,
+        found: headers
+      }, 400)
+    }
+
+    // Parse CSV data
+    const csvData = []
+    const errors = []
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim())
+      if (values.length !== headers.length) continue
+      
+      try {
+        const dateStr = values[0] // Format: DD/MM/YY
+        const [day, month, year] = dateStr.split('/')
+        const fullYear = year.length === 2 ? `20${year}` : year
+        const isoDate = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+        
+        csvData.push({
+          date: isoDate,
+          symbol: values[1].toUpperCase(),
+          quantity: parseFloat(values[2]),
+          price: parseFloat(values[3]),
+          totalValue: parseFloat(values[4])
+        })
+      } catch (error) {
+        errors.push(`Línea ${i + 1}: ${error.message}`)
+      }
+    }
+
+    if (csvData.length === 0) {
+      return c.json({
+        success: false,
+        error: 'No se pudieron procesar datos válidos del CSV',
+        parsing_errors: errors
+      }, 400)
+    }
+
+    console.log(`📊 Processed ${csvData.length} CSV rows, ${errors.length} errors`)
+
+    // Start transaction to replace daily snapshots
+    await c.env.DB.prepare('BEGIN TRANSACTION').run()
+    
+    try {
+      // STEP 1: Delete ALL existing daily snapshots
+      console.log('🗑️ Deleting existing daily snapshots...')
+      const deleteResult = await c.env.DB.prepare('DELETE FROM daily_snapshots').run()
+      console.log(`   Deleted ${deleteResult.changes} existing snapshots`)
+
+      // STEP 2: Insert new snapshots from CSV
+      console.log('📥 Inserting new snapshots from CSV...')
+      let insertCount = 0
+      
+      for (const row of csvData) {
+        // Calculate unrealized P&L (need to get holdings data)
+        const holding = await c.env.DB.prepare(`
+          SELECT quantity, avg_purchase_price, total_invested
+          FROM holdings 
+          WHERE asset_symbol = ?
+        `).bind(row.symbol).first()
+
+        let unrealizedPnl = 0
+        if (holding) {
+          const currentValue = row.quantity * row.price
+          unrealizedPnl = currentValue - holding.total_invested
+        }
+
+        // Insert daily snapshot
+        await c.env.DB.prepare(`
+          INSERT OR REPLACE INTO daily_snapshots (
+            asset_symbol, 
+            snapshot_date, 
+            quantity, 
+            price_per_unit, 
+            total_value, 
+            unrealized_pnl
+          ) VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(
+          row.symbol,
+          row.date,
+          row.quantity,
+          row.price,
+          row.totalValue,
+          unrealizedPnl
+        ).run()
+
+        insertCount++
+      }
+
+      // STEP 3: Update asset prices with latest from CSV
+      console.log('💰 Updating current asset prices...')
+      const latestPrices = new Map()
+      
+      // Find latest date for each symbol
+      csvData.forEach(row => {
+        if (!latestPrices.has(row.symbol) || row.date > latestPrices.get(row.symbol).date) {
+          latestPrices.set(row.symbol, row)
+        }
+      })
+
+      let priceUpdateCount = 0
+      for (const [symbol, data] of latestPrices) {
+        await c.env.DB.prepare(`
+          UPDATE assets 
+          SET current_price = ?, price_updated_at = CURRENT_TIMESTAMP
+          WHERE symbol = ?
+        `).bind(data.price, symbol).run()
+        priceUpdateCount++
+      }
+
+      // Commit transaction
+      await c.env.DB.prepare('COMMIT').run()
+
+      const summary = {
+        success: true,
+        message: 'Historial importado exitosamente',
+        stats: {
+          csv_rows_processed: csvData.length,
+          snapshots_deleted: deleteResult.changes,
+          snapshots_created: insertCount,
+          prices_updated: priceUpdateCount,
+          parsing_errors: errors.length
+        },
+        date_range: {
+          from: Math.min(...csvData.map(r => r.date)),
+          to: Math.max(...csvData.map(r => r.date))
+        },
+        assets_imported: [...new Set(csvData.map(r => r.symbol))].sort()
+      }
+
+      console.log('✅ CSV import completed successfully:', summary.stats)
+      return c.json(summary)
+
+    } catch (error) {
+      // Rollback on error
+      await c.env.DB.prepare('ROLLBACK').run()
+      throw error
+    }
+
+  } catch (error) {
+    console.error('❌ CSV import failed:', error)
+    return c.json({
+      success: false,
+      error: 'Error procesando archivo CSV',
+      details: error.message
+    }, 500)
+  }
+})
+
+// Get import history/status
+app.get('/api/import/status', async (c) => {
+  try {
+    // Get snapshot statistics
+    const snapshotStats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_snapshots,
+        COUNT(DISTINCT asset_symbol) as unique_assets,
+        MIN(snapshot_date) as oldest_date,
+        MAX(snapshot_date) as newest_date
+      FROM daily_snapshots
+    `).first()
+
+    // Get recent snapshots by asset
+    const recentSnapshots = await c.env.DB.prepare(`
+      SELECT 
+        asset_symbol,
+        MAX(snapshot_date) as last_snapshot,
+        COUNT(*) as snapshot_count
+      FROM daily_snapshots
+      GROUP BY asset_symbol
+      ORDER BY asset_symbol
+    `).all()
+
+    return c.json({
+      success: true,
+      statistics: snapshotStats,
+      assets: recentSnapshots.results || []
+    })
+
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: 'Error obteniendo estado de importación',
+      details: error.message
+    }, 500)
+  }
+})
+
 // ============================================
 // WATCHLIST PAGE
 // ============================================
@@ -8283,24 +9407,65 @@ app.get('/watchlist', (c) => {
     </head>
     <body class="bg-slate-700 bg-opacity-50 min-h-screen">
         <!-- Navigation -->
-        <nav class="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
-            <div class="max-w-7xl mx-auto px-6 py-4">
+        <nav class="nav-modern">
+            <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
-                    <div class="flex items-center space-x-8">
-                        <h1 class="text-2xl font-bold text-white" style="font-family: 'Times New Roman', serif;">GusBit</h1>
-                        <div class="hidden md:flex space-x-6">
-                            <a href="/" class="nav-link"><i class="fas fa-chart-pie mr-2"></i>Dashboard</a>
-                            <a href="/transactions" class="nav-link"><i class="fas fa-exchange-alt mr-2"></i>Transacciones</a>
-                            <a href="/wallet" class="nav-link"><i class="fas fa-wallet mr-2"></i>Wallet</a>
-                            <a href="/prices" class="nav-link"><i class="fas fa-chart-line mr-2"></i>Live Prices</a>
-                            <a href="/watchlist" class="nav-link active"><i class="fas fa-star mr-2"></i>Watchlist</a>
+                    <div class="flex items-center space-x-12">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-4">
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
+                                <div class="flex flex-col items-start">
+                                    <!-- GB con formas exactas y spacing perfecto -->
+                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
+                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
+                                    </div>
+                                    
+                                    <!-- GusBit con el mismo estilo tipográfico -->
+                                    <div class="-mt-1">
+                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                                            GusBit
+                                        </h1>
+                                        
+                                        <!-- Tagline con spacing perfecto -->
+                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                                            TRACK STOCKS<br>
+                                            ETFS &amp; CRYPTO
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        <nav class="hidden md:flex space-x-2">
+                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Dashboard
+                            </a>
+                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
+                            </a>
+                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-briefcase mr-2"></i>
+                                Portfolio
+                            </a>
+                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-upload mr-2"></i>
+                                Importar
+                            </a>
+                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-area mr-2"></i>
+                                Markets
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
+                            </a>
+                        </nav>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <button onclick="logout()" class="nav-link">
-                            <i class="fas fa-sign-out-alt mr-2"></i>Salir
-                        </button>
-                    </div>
+                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
+                        <i class="fas fa-power-off mr-2"></i>
+                        Salir
+                    </button>
                 </div>
             </div>
         </nav>
@@ -8740,6 +9905,450 @@ app.get('/watchlist', (c) => {
                 }, 4000);
             }
             
+            // Logout function
+            async function logout() {
+                try {
+                    await axios.post('/api/auth/logout');
+                    window.location.href = '/login';
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    window.location.href = '/login';
+                }
+            }
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================
+// CSV IMPORT PAGE
+// ============================================
+
+app.get('/import', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GusBit - Importar Historial</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <link href="/static/styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-slate-700 bg-opacity-50 min-h-screen">
+        <!-- Navigation -->
+        <nav class="nav-modern">
+            <div class="max-w-7xl mx-auto px-8 py-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-12">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-4">
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
+                                <div class="flex flex-col items-start">
+                                    <!-- GB con formas exactas y spacing perfecto -->
+                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
+                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
+                                    </div>
+                                    
+                                    <!-- GusBit con el mismo estilo tipográfico -->
+                                    <div class="-mt-1">
+                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                                            GusBit
+                                        </h1>
+                                        
+                                        <!-- Tagline con spacing perfecto -->
+                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                                            TRACK STOCKS<br>
+                                            ETFS &amp; CRYPTO
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <nav class="hidden md:flex space-x-2">
+                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Dashboard
+                            </a>
+                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
+                            </a>
+                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-briefcase mr-2"></i>
+                                Portfolio
+                            </a>
+                            <a href="/import" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
+                                <i class="fas fa-upload mr-2"></i>
+                                Importar
+                            </a>
+                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-area mr-2"></i>
+                                Markets
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-star mr-2"></i>
+                                Watchlist
+                            </a>
+                        </nav>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
+                        <i class="fas fa-power-off mr-2"></i>
+                        Salir
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="max-w-4xl mx-auto px-6 py-8">
+            <!-- Header -->
+            <div class="glass-card p-8 mb-8">
+                <div class="text-center">
+                    <h2 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent mb-4">
+                        <i class="fas fa-file-upload mr-3 text-blue-600"></i>
+                        Importar Historial CSV
+                    </h2>
+                    <p class="executive-text-primary">Reemplaza el historial completo con nuevos datos de un archivo CSV</p>
+                </div>
+            </div>
+
+            <!-- Warning Notice -->
+            <div class="bg-amber-50 border-l-4 border-amber-400 p-6 mb-8">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-amber-400 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-lg font-medium text-amber-800">⚠️ Advertencia Importante</h3>
+                        <div class="mt-2 text-sm text-amber-700">
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><strong>Se borrará todo el historial diario existente</strong> (daily_snapshots)</li>
+                                <li><strong>Las transacciones NO se verán afectadas</strong> (se mantienen intactas)</li>
+                                <li>Esta acción <strong>no se puede deshacer</strong></li>
+                                <li>Recomendamos hacer una copia de seguridad antes de continuar</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Import Status -->
+            <div id="importStatus" class="hidden mb-8"></div>
+
+            <!-- Upload Form -->
+            <div class="glass-card p-8 mb-8">
+                <h3 class="text-xl font-semibold text-gray-800 mb-6">
+                    <i class="fas fa-upload mr-2 text-blue-600"></i>
+                    Subir Archivo CSV
+                </h3>
+                
+                <form id="csvUploadForm" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Seleccionar archivo CSV
+                        </label>
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-blue-400 transition-colors">
+                            <div class="space-y-1 text-center">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400"></i>
+                                <div class="flex text-sm text-gray-600">
+                                    <label for="csvFile" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                        <span>Subir archivo</span>
+                                        <input id="csvFile" name="csvFile" type="file" accept=".csv" class="sr-only" required>
+                                    </label>
+                                    <p class="pl-1">o arrastra aquí</p>
+                                </div>
+                                <p class="text-xs text-gray-500">CSV hasta 10MB</p>
+                            </div>
+                        </div>
+                        <div id="fileInfo" class="mt-2 text-sm text-gray-600 hidden"></div>
+                    </div>
+
+                    <div class="flex justify-between">
+                        <button type="button" onclick="downloadTemplate()" class="btn-secondary">
+                            <i class="fas fa-download mr-2"></i>
+                            Descargar Plantilla
+                        </button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-upload mr-2"></i>
+                            Importar CSV
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Expected Format -->
+            <div class="glass-card p-8 mb-8">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-table mr-2 text-green-600"></i>
+                    Formato Esperado del CSV
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left">FECHA</th>
+                                <th class="px-4 py-2 text-left">MONEDA</th>
+                                <th class="px-4 py-2 text-left">TOTAL Cantidad</th>
+                                <th class="px-4 py-2 text-left">Precio final 9 PM</th>
+                                <th class="px-4 py-2 text-left">Valor USD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-t">
+                                <td class="px-4 py-2">15/01/24</td>
+                                <td class="px-4 py-2">Bitcoin</td>
+                                <td class="px-4 py-2">0.0025</td>
+                                <td class="px-4 py-2">42500.00</td>
+                                <td class="px-4 py-2">106.25</td>
+                            </tr>
+                            <tr class="border-t bg-gray-50">
+                                <td class="px-4 py-2">15/01/24</td>
+                                <td class="px-4 py-2">AAPL</td>
+                                <td class="px-4 py-2">10</td>
+                                <td class="px-4 py-2">185.50</td>
+                                <td class="px-4 py-2">1855.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <p><strong>Notas importantes:</strong></p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li>Formato de fecha: DD/MM/YY (ej: 15/01/24)</li>
+                        <li>MONEDA debe ser el símbolo del activo (Bitcoin, BTC, AAPL, etc.)</li>
+                        <li>Números con punto decimal (ej: 42500.00)</li>
+                        <li>Una fila por activo por fecha</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Current Status -->
+            <div class="glass-card p-8">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+                    Estado Actual del Historial
+                </h3>
+                <div id="currentStatus">
+                    <div class="text-center py-4">
+                        <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+                        <p class="mt-2 text-gray-600">Cargando estado actual...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Load current status on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                loadCurrentStatus();
+                
+                // File input change handler
+                document.getElementById('csvFile').addEventListener('change', handleFileSelect);
+                
+                // Form submit handler
+                document.getElementById('csvUploadForm').addEventListener('submit', handleFormSubmit);
+            });
+
+            // Load current import status
+            async function loadCurrentStatus() {
+                try {
+                    const response = await axios.get('/api/import/status');
+                    const data = response.data;
+                    
+                    if (data.success) {
+                        displayCurrentStatus(data.statistics, data.assets);
+                    }
+                } catch (error) {
+                    console.error('Error loading current status:', error);
+                    document.getElementById('currentStatus').innerHTML = 
+                        '<div class="text-center text-red-600"><i class="fas fa-exclamation-triangle"></i> Error cargando estado</div>';
+                }
+            }
+
+            // Display current status
+            function displayCurrentStatus(stats, assets) {
+                const container = document.getElementById('currentStatus');
+                
+                if (stats.total_snapshots === 0) {
+                    container.innerHTML = 
+                        '<div class="text-center py-8 text-gray-500">' +
+                            '<i class="fas fa-inbox text-4xl mb-4"></i>' +
+                            '<p>No hay historial importado</p>' +
+                        '</div>';
+                    return;
+                }
+
+                const html = 
+                    '<div class="grid md:grid-cols-2 gap-6">' +
+                        '<div class="bg-blue-50 p-4 rounded-lg">' +
+                            '<h4 class="font-semibold text-blue-800 mb-2">Estadísticas Generales</h4>' +
+                            '<div class="space-y-2 text-sm">' +
+                                '<div class="flex justify-between"><span>Total snapshots:</span><span class="font-medium">' + stats.total_snapshots + '</span></div>' +
+                                '<div class="flex justify-between"><span>Activos únicos:</span><span class="font-medium">' + stats.unique_assets + '</span></div>' +
+                                '<div class="flex justify-between"><span>Fecha más antigua:</span><span class="font-medium">' + stats.oldest_date + '</span></div>' +
+                                '<div class="flex justify-between"><span>Fecha más reciente:</span><span class="font-medium">' + stats.newest_date + '</span></div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="bg-green-50 p-4 rounded-lg">' +
+                            '<h4 class="font-semibold text-green-800 mb-2">Activos en Historial</h4>' +
+                            '<div class="space-y-1 text-sm max-h-32 overflow-y-auto">' +
+                                assets.map(asset => 
+                                    '<div class="flex justify-between"><span>' + asset.asset_symbol + '</span>' +
+                                    '<span class="text-xs text-gray-600">' + asset.snapshot_count + ' registros</span></div>'
+                                ).join('') +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                
+                container.innerHTML = html;
+            }
+
+            // Handle file selection
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                const fileInfo = document.getElementById('fileInfo');
+                
+                if (file) {
+                    const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                    fileInfo.innerHTML = '<i class="fas fa-file-csv mr-1"></i>' + file.name + ' (' + fileSize + ' MB)';
+                    fileInfo.classList.remove('hidden');
+                } else {
+                    fileInfo.classList.add('hidden');
+                }
+            }
+
+            // Handle form submission
+            async function handleFormSubmit(event) {
+                event.preventDefault();
+                
+                const fileInput = document.getElementById('csvFile');
+                const file = fileInput.files[0];
+                
+                if (!file) {
+                    alert('Por favor selecciona un archivo CSV');
+                    return;
+                }
+
+                // Show confirmation dialog
+                const confirmed = confirm(
+                    '¿Estás seguro de que quieres importar este CSV?\\n\\n' +
+                    '⚠️ ADVERTENCIA:\\n' +
+                    '• Se borrará todo el historial diario existente\\n' +
+                    '• Esta acción no se puede deshacer\\n' +
+                    '• Las transacciones NO se verán afectadas'
+                );
+                
+                if (!confirmed) return;
+
+                // Prepare form data
+                const formData = new FormData();
+                formData.append('csv_file', file);
+
+                // Show loading status
+                showImportStatus('loading', 'Procesando archivo CSV...');
+
+                try {
+                    const response = await axios.post('/api/import/csv', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    });
+                    
+                    const data = response.data;
+                    
+                    if (data.success) {
+                        showImportStatus('success', 'Importación exitosa', data);
+                        // Reload current status
+                        loadCurrentStatus();
+                        // Clear form
+                        fileInput.value = '';
+                        document.getElementById('fileInfo').classList.add('hidden');
+                    } else {
+                        showImportStatus('error', data.error, data);
+                    }
+                    
+                } catch (error) {
+                    console.error('Import error:', error);
+                    const errorMsg = error.response?.data?.error || 'Error procesando archivo';
+                    showImportStatus('error', errorMsg, error.response?.data);
+                }
+            }
+
+            // Show import status message
+            function showImportStatus(type, message, data = null) {
+                const container = document.getElementById('importStatus');
+                container.classList.remove('hidden');
+                
+                let bgColor, textColor, icon;
+                
+                if (type === 'loading') {
+                    bgColor = 'bg-blue-50';
+                    textColor = 'text-blue-800';
+                    icon = '<i class="fas fa-spinner fa-spin text-blue-600"></i>';
+                } else if (type === 'success') {
+                    bgColor = 'bg-green-50';
+                    textColor = 'text-green-800';
+                    icon = '<i class="fas fa-check-circle text-green-600"></i>';
+                } else {
+                    bgColor = 'bg-red-50';
+                    textColor = 'text-red-800';
+                    icon = '<i class="fas fa-exclamation-triangle text-red-600"></i>';
+                }
+
+                let detailsHtml = '';
+                if (data && type === 'success' && data.stats) {
+                    detailsHtml = 
+                        '<div class="mt-4 text-sm">' +
+                            '<h4 class="font-semibold mb-2">Resumen de importación:</h4>' +
+                            '<div class="grid grid-cols-2 gap-4">' +
+                                '<div>• Filas procesadas: ' + data.stats.csv_rows_processed + '</div>' +
+                                '<div>• Snapshots creados: ' + data.stats.snapshots_created + '</div>' +
+                                '<div>• Snapshots eliminados: ' + data.stats.snapshots_deleted + '</div>' +
+                                '<div>• Precios actualizados: ' + data.stats.prices_updated + '</div>' +
+                            '</div>' +
+                            '<div class="mt-2">' +
+                                '<strong>Período:</strong> ' + data.date_range.from + ' a ' + data.date_range.to + '<br>' +
+                                '<strong>Activos:</strong> ' + data.assets_imported.join(', ') +
+                            '</div>' +
+                        '</div>';
+                }
+
+                container.innerHTML = 
+                    '<div class="' + bgColor + ' border border-' + (type === 'loading' ? 'blue' : type === 'success' ? 'green' : 'red') + '-200 rounded-lg p-6">' +
+                        '<div class="flex items-start">' +
+                            '<div class="flex-shrink-0">' + icon + '</div>' +
+                            '<div class="ml-3">' +
+                                '<h3 class="text-lg font-medium ' + textColor + '">' + message + '</h3>' +
+                                detailsHtml +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+            }
+
+            // Download CSV template
+            function downloadTemplate() {
+                const csvContent = 
+                    'FECHA,MONEDA,TOTAL Cantidad,Precio final 9 PM,Valor USD\\n' +
+                    '15/01/24,Bitcoin,0.0025,42500.00,106.25\\n' +
+                    '15/01/24,AAPL,10,185.50,1855.00\\n' +
+                    '16/01/24,Bitcoin,0.0025,43200.00,108.00\\n' +
+                    '16/01/24,AAPL,10,188.20,1882.00';
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'plantilla_importacion.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+
             // Logout function
             async function logout() {
                 try {
