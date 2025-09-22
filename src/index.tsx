@@ -278,6 +278,47 @@ app.post('/api/auth/logout', (c) => {
   return c.json({ success: true })
 })
 
+// ============================================
+// MANUAL SNAPSHOT TRIGGER (Development Only)
+// ============================================
+
+app.post('/api/manual-snapshot', async (c) => {
+  try {
+    const { time: mazatlanTime } = getMazatlanTime()
+    console.log(`🔧 Manual snapshot triggered at ${mazatlanTime.toISOString()}`)
+    
+    const result = await processAllDailySnapshots(c.env.DB)
+    return c.json({
+      success: true,
+      message: 'Manual snapshot completed',
+      mazatlan_time: mazatlanTime.toISOString(),
+      result: result
+    })
+  } catch (error) {
+    console.error('❌ Manual snapshot error:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'Manual snapshot failed'
+    }, 500)
+  }
+})
+
+// API endpoint to get daily snapshots
+app.get('/api/daily-snapshots', async (c) => {
+  try {
+    const snapshots = await c.env.DB.prepare(`
+      SELECT DISTINCT snapshot_date, asset_symbol, current_price
+      FROM daily_snapshots 
+      ORDER BY snapshot_date DESC, asset_symbol ASC
+    `).all()
+    
+    return c.json(snapshots.results || [])
+  } catch (error) {
+    console.error('Error fetching daily snapshots:', error)
+    return c.json({ error: 'Failed to fetch snapshots' }, 500)
+  }
+})
+
 // Force logout endpoint (clears all cookies)
 app.get('/api/auth/force-logout', (c) => {
   // Clear session cookie
@@ -594,6 +635,35 @@ app.get('/', (c) => {
                 </div>
                 <div id="recent-transactions" class="overflow-hidden">
                     <!-- Transactions will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Manual Snapshot Control (Development) -->
+            <div class="executive-card executive-border rounded-2xl p-8 executive-shadow mb-16">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-purple-900 bg-opacity-50 rounded-xl flex items-center justify-center border border-purple-500 border-opacity-30">
+                            <i class="fas fa-camera text-purple-400 text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-light executive-text-primary tracking-tight">Daily Snapshots</h3>
+                            <p class="executive-text-secondary text-sm font-medium">Sistema automático de captura diaria (9PM Mazatlán)</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div id="snapshot-status" class="text-slate-400">
+                            <i class="fas fa-sync fa-spin"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                    <div class="text-sm executive-text-secondary" id="snapshot-info">
+                        Verificando estado de snapshots automáticos...
+                    </div>
+                    <button onclick="forceManualSnapshot()" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all font-medium" id="manual-snapshot-btn">
+                        <i class="fas fa-play mr-2"></i> Ejecutar Ahora
+                    </button>
                 </div>
             </div>
         </div>
@@ -1717,11 +1787,82 @@ app.get('/', (c) => {
                 }
             }
 
+            // Check snapshot status
+            async function checkSnapshotStatus() {
+                try {
+                    // Get today in Mazatlán timezone
+                    const today = new Date();
+                    const mazatlanToday = new Date(today.toLocaleString("en-US", {timeZone: "America/Mazatlan"}));
+                    const todayStr = mazatlanToday.getFullYear() + '-' + 
+                                   String(mazatlanToday.getMonth() + 1).padStart(2, '0') + '-' + 
+                                   String(mazatlanToday.getDate()).padStart(2, '0');
+
+                    // Check if snapshots exist for today
+                    const response = await axios.get('/api/daily-snapshots');
+                    const snapshots = response.data;
+                    
+                    const todaySnapshots = snapshots.filter(s => s.snapshot_date === todayStr);
+                    
+                    const statusEl = document.getElementById('snapshot-status');
+                    const infoEl = document.getElementById('snapshot-info');
+                    
+                    if (todaySnapshots.length > 0) {
+                        statusEl.innerHTML = '<i class="fas fa-check-circle text-green-400"></i>';
+                        infoEl.textContent = 'Snapshots del ' + todayStr + ' completados (' + todaySnapshots.length + ' activos)';
+                    } else {
+                        statusEl.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-400"></i>';
+                        infoEl.textContent = 'No hay snapshots para ' + todayStr + '. Usa el boton para generar manualmente.';
+                    }
+                } catch (error) {
+                    console.error('Error checking snapshot status:', error);
+                    document.getElementById('snapshot-status').innerHTML = '<i class="fas fa-times-circle text-red-400"></i>';
+                }
+            }
+
+            // Force manual snapshot
+            async function forceManualSnapshot() {
+                const button = document.getElementById('manual-snapshot-btn');
+                const originalText = button.innerHTML;
+                
+                try {
+                    // Show loading state
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...';
+                    button.disabled = true;
+                    
+                    const response = await axios.post('/api/manual-snapshot');
+                    const data = response.data;
+                    
+                    if (data.success) {
+                        alert('Snapshots completados exitosamente!\\n\\nDetalles:\\n- Exitosos: ' + (data.result.successCount || 0) + '\\n- Omitidos: ' + (data.result.skippedCount || 0) + '\\n- Errores: ' + (data.result.errorCount || 0));
+                        
+                        // Refresh status
+                        await checkSnapshotStatus();
+                        
+                        // Refresh dashboard data
+                        await loadDashboard();
+                    } else {
+                        alert('Error al ejecutar snapshots: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Error executing manual snapshot:', error);
+                    alert('Error de conexion al ejecutar snapshots: ' + (error.response?.data?.error || error.message));
+                } finally {
+                    // Restore button state
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            }
+
             // Load dashboard on page load
             console.log('Setting up dashboard loader...');
             document.addEventListener('DOMContentLoaded', function() {
                 console.log('DOM loaded, starting dashboard...');
                 loadDashboard();
+                
+                // Check snapshot status
+                setTimeout(() => {
+                    checkSnapshotStatus();
+                }, 1000);
             });
         </script>
     </body>
