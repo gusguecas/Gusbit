@@ -6,11 +6,20 @@
 - **Features**: Asset tracking, portfolio management, live prices search, watchlist, and transaction management
 
 ## URLs
-- **Development**: https://3000-i3a0u0ap8gmfj3qeuldt7-6532622b.e2b.dev
-- **Login**: https://3000-i3a0u0ap8gmfj3qeuldt7-6532622b.e2b.dev/login (Password: asset123)
+- **Development**: https://3000-ihkrodwx4nqmux0qp0er9-6532622b.e2b.dev
+- **Login**: https://3000-ihkrodwx4nqmux0qp0er9-6532622b.e2b.dev/login (Password: asset123)
+- **Análisis de Decisiones**: https://3000-ihkrodwx4nqmux0qp0er9-6532622b.e2b.dev/analysis
 - **GitHub**: [To be configured]
 
 ## Recently Completed Features ✅
+- **✅ ANÁLISIS DE DECISIONES RESTAURADO**: **MAJOR RESTORATION** - Sección de análisis completa funcionando al 100%
+  - **Funcionalidad completa**: Tabla Delta Toro con recomendaciones automáticas de decisión
+  - **Filtros avanzados**: Por activo (BTC, ETH, SUI) y por ganancias/pérdidas
+  - **Decisiones inteligentes**: Mantener, Comprar Más, Stop Loss, Considerar Venta (basado en % G/P)
+  - **Resúmenes ejecutivos**: Ganancias Altas (>20%), Pérdidas Actuales (<-5%), Posiciones Neutras
+  - **Integración completa**: Enlaces de navegación en todos los menús, precios en tiempo real
+  - **Gestión de transacciones**: Eliminación individual de transacciones directamente desde análisis
+  - **Estilo profesional**: Diseño Delta Toro para análisis serio de inversión
 - **✅ Live Prices Section Reconstruction**: Completely rebuilt with simplified approach
 - **✅ Asset Search**: Simple search interface using CoinGecko and Yahoo Finance APIs
 - **✅ Watchlist Integration**: Direct integration to add searched assets to watchlist
@@ -50,7 +59,8 @@
 - `GET /wallet` - Wallet/Portfolio view (requires auth)
 - `GET /prices` - **Live Prices Search** (requires auth) - Markets section
 - `GET /watchlist` - Watchlist management (requires auth)
-- `GET /import` - **NEW: CSV Import** (requires auth) - Historical data import functionality
+- `GET /import` - **CSV Import** (requires auth) - Historical data import functionality
+- `GET /analysis` - **RESTORED: Análisis de Decisiones** (requires auth) - Delta Toro decision analysis tool
 
 ### API Endpoints
 **Authentication & Core**
@@ -145,7 +155,7 @@ loadWatchlist()      // Load and display current watchlist
 - **Tech Stack**: Hono + TypeScript + TailwindCSS + Cloudflare D1
 - **Build Command**: `npm run build`
 - **Dev Command**: `npm run dev:sandbox` (with PM2)
-- **Last Updated**: September 21, 2025 - Header Standardization & CSV Import
+- **Last Updated**: September 22, 2025 - Análisis de Decisiones Restoration
 
 ## Recently Completed Features ✅ (September 21, 2025)
 - **✅ Header Estandarization**: Unified modern header design across all sections
