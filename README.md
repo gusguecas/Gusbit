@@ -12,6 +12,13 @@
 - **GitHub**: [To be configured]
 
 ## Recently Completed Features ✅
+- **✅ BOTÓN FORZAR SNAPSHOTS RESTAURADO**: **CRITICAL FIX** - Control manual de snapshots diarios restaurado
+  - **Botón "Ejecutar Ahora"**: Genera snapshots manualmente cuando faltan (ej: domingo 21 septiembre)
+  - **Estado visual**: Indicador de snapshots completados/faltantes/error en tiempo real
+  - **API manual-snapshot**: Endpoint POST /api/manual-snapshot para ejecución bajo demanda
+  - **Verificación automática**: checkSnapshotStatus() verifica snapshots del día actual al cargar
+  - **Feedback completo**: Muestra estadísticas de éxito, omitidos y errores tras ejecución
+  - **Solución definitiva**: Resuelve problema de snapshots faltantes de fechas específicas
 - **✅ ANÁLISIS DE DECISIONES RESTAURADO**: **MAJOR RESTORATION** - Sección de análisis completa funcionando al 100%
   - **Funcionalidad completa**: Tabla Delta Toro con recomendaciones automáticas de decisión
   - **Filtros avanzados**: Por activo (BTC, ETH, SUI) y por ganancias/pérdidas
