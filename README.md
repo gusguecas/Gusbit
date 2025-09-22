@@ -12,6 +12,13 @@
 - **GitHub**: [To be configured]
 
 ## Recently Completed Features ✅
+- **✅ PRECIO DOMINGO 21 SEPTIEMBRE SOLUCIONADO**: **CRITICAL FIX COMPLETE** - Precio histórico restaurado correctamente
+  - **Problema identificado**: Rate limiting de CoinGecko API durante weekend causaba precio fallback ($0.01)
+  - **Solución implementada**: Endpoint /fix-btc-sept21-price con precio histórico real de CoinGecko
+  - **Precio corregido**: BTC 21 sept actualizado de $0.01 a $115,715.52 (precio histórico real)
+  - **Mejoras permanentes**: fetchRealTimePrice() con reintentos y mejor manejo de rate limiting
+  - **Herramientas adicionales**: /force-snapshots-sept21 para regenerar snapshots específicos
+  - **API mejorada**: /api/daily-snapshots arreglado (price_per_unit vs current_price)
 - **✅ BOTÓN FORZAR SNAPSHOTS RESTAURADO**: **CRITICAL FIX** - Control manual de snapshots diarios restaurado
   - **Botón "Ejecutar Ahora"**: Genera snapshots manualmente cuando faltan (ej: domingo 21 septiembre)
   - **Estado visual**: Indicador de snapshots completados/faltantes/error en tiempo real
