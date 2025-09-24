@@ -256,6 +256,7 @@ app.get('/login', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Login</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -1393,6 +1394,7 @@ app.get('/', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Dashboard</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -3182,7 +3184,11 @@ app.get('/api/portfolio/diversification', async (c) => {
       value: item.totalValue
     }))
 
-    return c.json(result)
+    return c.json(result, 200, {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    })
   } catch (error) {
     return c.json({ error: 'Error fetching diversification data' }, 500)
   }
@@ -3371,11 +3377,49 @@ app.get('/api/portfolio/evolution-nuclear', async (c) => {
       category: category,
       nuclear_version: true,
       message: "GUARANTEED CORRECT DATA FROM DATABASE"
+    }, 200, {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     })
   } catch (error) {
     console.error(' NUCLEAR error:', error)
     return c.json({ error: 'Nuclear evolution error', details: error.message }, 500)
   }
+})
+
+// Clear cache helper
+app.get('/clear-cache', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Clear Cache - GusBit</title>
+        <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="pragma" content="no-cache">
+        <meta http-equiv="expires" content="0">
+    </head>
+    <body>
+        <h1>Cache Cleared Successfully!</h1>
+        <p>Your browser cache has been forcefully cleared.</p>
+        <script>
+            // Force reload without cache
+            localStorage.clear();
+            sessionStorage.clear();
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => {
+                        caches.delete(name);
+                    });
+                });
+            }
+            setTimeout(() => {
+                window.location.href = '/?v=' + Date.now();
+            }, 1000);
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 // Auto-login for debugging
@@ -4230,6 +4274,7 @@ app.get('/transactions', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Transacciones</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -6428,6 +6473,7 @@ app.get('/import', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Importar Datos</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -8085,6 +8131,7 @@ app.get('/asset/:symbol', (c) => {
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -9443,6 +9490,7 @@ app.get('/wallet', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Portfolio</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -9822,6 +9870,7 @@ app.get('/asset/:symbol', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - ${symbol}</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -11389,6 +11438,7 @@ app.get('/crypto', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Crypto Hub</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -12214,6 +12264,7 @@ app.get('/prices', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Markets Hub</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -13091,6 +13142,7 @@ app.get('/prices-with-complex-js', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Markets Hub</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -15150,6 +15202,7 @@ app.get('/crypto', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Crypto Hub</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -15955,6 +16008,7 @@ app.get('/watchlist', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Watchlist Operativo</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <link href="/static/styles.css" rel="stylesheet">
@@ -17230,6 +17284,7 @@ app.get('/explore/:symbol', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Explorar ${symbol}</title>
         <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -18268,6 +18323,7 @@ app.get('/analysis', async (c) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>GusBit - Análisis de Decisiones</title>
           <!-- TailwindCSS compilado para producción -->
+        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
           <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
           <link href="/static/styles.css" rel="stylesheet">
       </head>
