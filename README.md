@@ -60,6 +60,7 @@
 
 ### **Holdings (Portafolio)**
 ```sql
+<<<<<<< HEAD
 CREATE TABLE holdings (
   id INTEGER PRIMARY KEY,
   asset_symbol TEXT NOT NULL,
@@ -72,6 +73,8 @@ CREATE TABLE holdings (
 
 ### **Watchlist (Seguimiento)**
 ```sql
+=======
+>>>>>>> 48b22f37fb0727d056c370c9ba405ef849258fe1
 CREATE TABLE watchlist (
   id INTEGER PRIMARY KEY,
   asset_symbol TEXT UNIQUE NOT NULL,
@@ -82,10 +85,13 @@ CREATE TABLE watchlist (
   active_alerts BOOLEAN DEFAULT FALSE,
   added_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+<<<<<<< HEAD
 ```
 
 ### **Assets (Precios)**
 ```sql
+=======
+>>>>>>> 48b22f37fb0727d056c370c9ba405ef849258fe1
 CREATE TABLE assets (
   symbol TEXT PRIMARY KEY,
   name TEXT,
@@ -93,6 +99,7 @@ CREATE TABLE assets (
   price_change_24h REAL,
   last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+<<<<<<< HEAD
 ```
 
 ## 🚀 Funcionalidades Recientes Implementadas
@@ -204,3 +211,13 @@ git push origin main
 El sistema está diseñado para ser auto-mantenible con updates automáticos de precios. Para modificaciones o nuevas features, el código está completamente documentado y modularizado.
 
 **¡Listo para deployment en la nube! 🚀**
+=======
+TABLE holdings (
+  id INTEGER PRIMARY KEY,
+  asset_symbol TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  average_price REAL NOT NULL,
+  current_value REAL,
+  last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+>>>>>>> 48b22f37fb0727d056c370c9ba405ef849258fe1
