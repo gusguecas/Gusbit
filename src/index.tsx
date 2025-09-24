@@ -9,6 +9,121 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>()
 
+// ============================================
+// AUTOMATIC DATABASE INITIALIZATION
+// ============================================
+async function initializeDatabase(DB: D1Database) {
+  try {
+    console.log('🗄️ Initializing database tables...')
+    
+    // Create tables if they don't exist
+    await DB.batch([
+      // Holdings table
+      DB.prepare(`
+        CREATE TABLE IF NOT EXISTS holdings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          asset_symbol TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          average_price REAL NOT NULL,
+          current_value REAL,
+          last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `),
+      
+      // Transactions table
+      DB.prepare(`
+        CREATE TABLE IF NOT EXISTS transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          asset_symbol TEXT NOT NULL,
+          transaction_type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          price_per_unit REAL NOT NULL,
+          transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+          notes TEXT
+        )
+      `),
+      
+      // Watchlist table
+      DB.prepare(`
+        CREATE TABLE IF NOT EXISTS watchlist (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          asset_symbol TEXT UNIQUE NOT NULL,
+          name TEXT,
+          category TEXT NOT NULL,
+          target_price REAL,
+          notes TEXT,
+          active_alerts BOOLEAN DEFAULT FALSE,
+          added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `),
+      
+      // Assets table
+      DB.prepare(`
+        CREATE TABLE IF NOT EXISTS assets (
+          symbol TEXT PRIMARY KEY,
+          name TEXT,
+          current_price REAL,
+          price_change_24h REAL,
+          last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `),
+      
+      // Config table
+      DB.prepare(`
+        CREATE TABLE IF NOT EXISTS config (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `),
+      
+      // Daily snapshots table
+      DB.prepare(`
+        CREATE TABLE IF NOT EXISTS daily_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          snapshot_date DATE NOT NULL,
+          asset_symbol TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          price_per_unit REAL NOT NULL,
+          total_value REAL NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+    ])
+    
+    // Insert default config values
+    await DB.prepare(`
+      INSERT OR IGNORE INTO config (key, value) VALUES ('app_password', 'asset123')
+    `).run()
+    
+    await DB.prepare(`
+      INSERT OR IGNORE INTO config (key, value) VALUES ('app_version', '2.0.0')
+    `).run()
+    
+    console.log('✅ Database initialization complete')
+    return true
+  } catch (error) {
+    console.error('❌ Database initialization failed:', error)
+    return false
+  }
+}
+
+// Auto-initialize database on first request
+app.use('*', async (c, next) => {
+  if (c.env.DB) {
+    // Check if tables exist by trying to query config table
+    try {
+      await c.env.DB.prepare('SELECT COUNT(*) FROM config').first()
+    } catch (error) {
+      // If config table doesn't exist, initialize database
+      console.log('🔄 Database not initialized, creating tables...')
+      await initializeDatabase(c.env.DB)
+    }
+  }
+  return next()
+})
+
 // Enable CORS for all routes with comprehensive configuration
 app.use('*', cors({
   origin: '*',
