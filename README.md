@@ -1,230 +1,206 @@
-# GusBit - Financial Tracking Application
+# 🚀 GusBit Financial Tracker
 
-## Project Overview
-- **Name**: GusBit Financial Tracker
-- **Goal**: Complete financial tracking application for stocks, ETFs, and cryptocurrency
-- **Features**: Asset tracking, portfolio management, live prices search, watchlist, and transaction management
+## 📊 Sistema Completo de Seguimiento de Inversiones
 
-## URLs
-- **Development**: https://3000-ihkrodwx4nqmux0qp0er9-6532622b.e2b.dev
-- **Login**: https://3000-ihkrodwx4nqmux0qp0er9-6532622b.e2b.dev/login (Password: asset123)
-- **Análisis de Decisiones**: https://3000-ihkrodwx4nqmux0qp0er9-6532622b.e2b.dev/analysis
-- **GitHub**: [To be configured]
+**GusBit** es una plataforma avanzada para el tracking de inversiones en tiempo real que incluye acciones, ETFs y criptomonedas con análisis técnico profesional y alertas inteligentes.
 
-## Recently Completed Features ✅
-- **✅ PRECIO DOMINGO 21 SEPTIEMBRE SOLUCIONADO**: **CRITICAL FIX COMPLETE** - Precio histórico restaurado correctamente
-  - **Problema identificado**: Rate limiting de CoinGecko API durante weekend causaba precio fallback ($0.01)
-  - **Solución implementada**: Endpoint /fix-btc-sept21-price con precio histórico real de CoinGecko
-  - **Precio corregido**: BTC 21 sept actualizado de $0.01 a $115,715.52 (precio histórico real)
-  - **Mejoras permanentes**: fetchRealTimePrice() con reintentos y mejor manejo de rate limiting
-  - **Herramientas adicionales**: /force-snapshots-sept21 para regenerar snapshots específicos
-  - **API mejorada**: /api/daily-snapshots arreglado (price_per_unit vs current_price)
-- **✅ BOTÓN FORZAR SNAPSHOTS RESTAURADO**: **CRITICAL FIX** - Control manual de snapshots diarios restaurado
-  - **Botón "Ejecutar Ahora"**: Genera snapshots manualmente cuando faltan (ej: domingo 21 septiembre)
-  - **Estado visual**: Indicador de snapshots completados/faltantes/error en tiempo real
-  - **API manual-snapshot**: Endpoint POST /api/manual-snapshot para ejecución bajo demanda
-  - **Verificación automática**: checkSnapshotStatus() verifica snapshots del día actual al cargar
-  - **Feedback completo**: Muestra estadísticas de éxito, omitidos y errores tras ejecución
-  - **Solución definitiva**: Resuelve problema de snapshots faltantes de fechas específicas
-- **✅ ANÁLISIS DE DECISIONES RESTAURADO**: **MAJOR RESTORATION** - Sección de análisis completa funcionando al 100%
-  - **Funcionalidad completa**: Tabla Delta Toro con recomendaciones automáticas de decisión
-  - **Filtros avanzados**: Por activo (BTC, ETH, SUI) y por ganancias/pérdidas
-  - **Decisiones inteligentes**: Mantener, Comprar Más, Stop Loss, Considerar Venta (basado en % G/P)
-  - **Resúmenes ejecutivos**: Ganancias Altas (>20%), Pérdidas Actuales (<-5%), Posiciones Neutras
-  - **Integración completa**: Enlaces de navegación en todos los menús, precios en tiempo real
-  - **Gestión de transacciones**: Eliminación individual de transacciones directamente desde análisis
-  - **Estilo profesional**: Diseño Delta Toro para análisis serio de inversión
-- **✅ Live Prices Section Reconstruction**: Completely rebuilt with simplified approach
-- **✅ Asset Search**: Simple search interface using CoinGecko and Yahoo Finance APIs
-- **✅ Watchlist Integration**: Direct integration to add searched assets to watchlist
-- **✅ Clean UI**: Glass card design with GusBit branding (Times New Roman typography)
-- **✅ API Integration**: Working `/api/assets/search` endpoint with multi-source results
-- **✅ Authentication**: Secure session-based authentication system
-- **✅ Watchlist Deletion Fix**: Fixed JavaScript syntax error preventing asset removal from watchlist
-- **✅ Wallet Page Fix**: Resolved duplicate route conflict that prevented /wallet from working
-- **✅ Transactions Design Fix**: Updated transactions page to use modern gradient design consistent with other pages
-- **✅ Daily Snapshots Display Fix**: **MAJOR BUG RESOLVED** - Fixed missing daily snapshots in asset detail pages
-  - Issue: Snapshots from recent dates (Sept 18, 2025) not appearing in "Historial Diario" table
-  - Root Cause: JavaScript date parsing with timezone offset causing -1 day shift
-  - Solution: Modified date parsing to `new Date(snapshot.snapshot_date + 'T00:00:00')` for local time
-  - Impact: Users now see complete daily snapshot history including most recent 9 PM Mazatlán snapshots
-- **✅ Dashboard Enhancement**: **NEW FEATURE** - Completely redesigned dashboard with modern KPI layout
-  - Added: Portfolio evolution chart showing total USD value over time (7D, 30D, 90D views)
-  - Added: Clean KPI cards for Portfolio Value, Total Invested, and Total Gain/Loss
-  - Added: Organized assets list section with current values and performance indicators
-  - Maintained: Existing pie chart for portfolio diversification
-  - Enhanced: Better visual hierarchy and modern glass card design
-- **✅ Header Standardization**: All sections now have consistent modern navigation
-  - Unified GusBit branding with GB logo and professional tagline
-  - Complete navigation menu across all pages (Dashboard, Transacciones, Portfolio, Importar, Markets, Watchlist)
-  - Active page highlighting and consistent styling
-- **✅ CSV Import System**: Full-featured import functionality for historical data
-  - Dedicated /import page with drag-and-drop file upload
-  - Smart data replacement (clears daily snapshots, preserves transactions)
-  - CSV format validation and detailed error reporting
-  - Import statistics and status monitoring
+## ✨ Características Principales
 
-## Current Functional Entry URIs
+### 🎯 **Funcionalidades Core**
+- **Dashboard Ejecutivo** - Vista panorámica de todo tu portafolio
+- **Watchlist Operativo** - Seguimiento activo con alertas personalizadas  
+- **Markets Hub** - Noticias financieras, indicadores y trending assets
+- **Crypto Hub** - Centro especializado en criptomonedas
+- **Modo Exploración** - Análisis de activos sin necesidad de poseerlos
 
-### Main Application Routes
-- `GET /` - **ENHANCED: Dashboard** (requires auth) - New KPI layout with portfolio evolution chart
-- `GET /login` - Login page
-- `GET /transactions` - Transaction management (requires auth)
-- `GET /wallet` - Wallet/Portfolio view (requires auth)
-- `GET /prices` - **Live Prices Search** (requires auth) - Markets section
-- `GET /watchlist` - Watchlist management (requires auth)
-- `GET /import` - **CSV Import** (requires auth) - Historical data import functionality
-- `GET /analysis` - **RESTORED: Análisis de Decisiones** (requires auth) - Delta Toro decision analysis tool
+### 📈 **Características Técnicas**
+- **Precios en Tiempo Real** - Conectado a APIs externas (CoinGecko, Yahoo Finance)
+- **Gráficas Históricas** - Timeframes: 1D, 1W, 1M, 1Y con datos únicos por activo
+- **Alertas Inteligentes** - Notificaciones cuando se alcanzan objetivos
+- **Base de Datos D1** - Persistencia completa de datos
+- **Arquitectura Edge** - Desplegado en Cloudflare Workers/Pages
 
-### API Endpoints
-**Authentication & Core**
-- `POST /api/auth/login` - Authentication (body: `{"password": "asset123"}`)
-- `GET /api/assets/search?q=SYMBOL` - Search assets (BTC, AAPL, etc.)
+## 🔗 URLs de Acceso
 
-**Portfolio & Dashboard (NEW)**
-- `GET /api/portfolio/summary` - Portfolio KPI summary (total invested, current value, PnL)
-- `GET /api/portfolio/evolution` - Portfolio value evolution over time for charts
-- `GET /api/portfolio/diversification` - Asset category distribution for pie chart
-- `GET /api/portfolio/assets` - Organized list of portfolio assets with performance
+### 🌐 **Aplicación Principal**
+- **Dashboard:** `/` - Vista general del sistema
+- **Watchlist:** `/watchlist` - Control de inversiones con alertas
+- **Markets:** `/prices` - Hub de mercados y noticias
+- **Crypto Hub:** `/crypto` - Centro de criptomonedas
+- **Portfolio:** `/wallet` - Gestión completa de portafolio
 
-**Watchlist & Transactions**
-- `GET /api/watchlist` - Get user's watchlist
-- `POST /api/watchlist` - Add asset to watchlist
-- `PUT /api/watchlist/:id` - Update watchlist item
-- `DELETE /api/watchlist/:symbol` - Remove from watchlist (by asset symbol)
-- `GET /api/transactions` - Get transactions
-- `GET /api/transactions/recent` - Recent transactions for dashboard
-- `POST /api/transactions` - Add transaction
+### 🔍 **Modo Exploración (Nuevo)**
+- **Explorar BTC:** `/explore/BTC?category=crypto`
+- **Explorar AAPL:** `/explore/AAPL?category=stocks`
+- **Explorar TSLA:** `/explore/TSLA?category=stocks`
+- **API Histórica:** `/api/historical/:symbol?timeframe=1D&category=crypto`
 
-**CSV Import & Historical Data**
-- `POST /api/import/csv` - **NEW**: Import CSV file and replace daily snapshots (preserves transactions)
-- `GET /api/import/status` - **NEW**: Get import statistics and current historical data status
+## 🏗️ Arquitectura Técnica
 
-## Data Architecture
-- **Data Models**: 
-  - Users, Assets, Watchlist, Transactions, Config
-  - Asset categories: stocks, crypto, etfs
-  - API sources: alphavantage, coingecko, yahoo
-- **Storage Services**: Cloudflare D1 SQLite database
-- **Data Flow**: Frontend → Hono API → D1 Database → External APIs (CoinGecko, Alpha Vantage)
+### **Frontend**
+- **Framework:** Hono + TypeScript para edge computing
+- **Styling:** TailwindCSS con diseño ejecutivo dark theme
+- **Charts:** Chart.js para gráficas interactivas
+- **Icons:** FontAwesome 6.4.0
 
-## User Guide
-1. **Login**: Use password `asset123` to access the application
-2. **Search Assets**: Navigate to "Precios en Vivo", enter symbol (BTC, AAPL, etc.)
-3. **Add to Watchlist**: After searching, click "Agregar al Watchlist" to save assets
-4. **View Watchlist**: See all tracked assets with current prices and performance
-5. **Manage Portfolio**: Add transactions to track your actual investments
+### **Backend & APIs**
+- **Runtime:** Cloudflare Workers (edge-first)
+- **Database:** Cloudflare D1 SQLite
+- **External APIs:** 
+  - CoinGecko (criptomonedas reales)
+  - Yahoo Finance (acciones estimadas)
+  - Alternative.me (Fear & Greed Index)
 
-## Technical Implementation
+### **Deployment**
+- **Platform:** Cloudflare Pages
+- **CDN:** Global edge distribution
+- **Build:** Vite + Wrangler CLI
 
-### Enhanced Dashboard (New Implementation)
-**Location**: `/` route in `/src/index.tsx` (lines 227-357)
+## 📊 Modelos de Datos
 
-**Key Features**:
-- **KPI Cards**: Portfolio Value, Total Invested, Total Gain/Loss with percentages
-- **Portfolio Evolution Chart**: Interactive line chart showing total USD value over time
-- **Time Range Filters**: 7D, 30D, 90D views for portfolio evolution
-- **Assets List**: Organized display of portfolio assets with performance indicators
-- **Diversification Chart**: Maintained existing pie chart for category breakdown
-- **Recent Transactions**: Latest portfolio movements and activities
-
-**JavaScript Functions**:
-```javascript
-loadDashboard()                    // Main dashboard loader
-updatePortfolioEvolutionChart()    // Render portfolio evolution chart
-changePortfolioRange()             // Handle time range changes (7D/30D/90D)
-displayAssetsList()                // Show organized assets with performance
-updateDiversificationChart()       // Update pie chart for diversification
-filterPortfolioDataByRange()       // Filter evolution data by time range
+### **Holdings (Portafolio)**
+```sql
+CREATE TABLE holdings (
+  id INTEGER PRIMARY KEY,
+  asset_symbol TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  average_price REAL NOT NULL,
+  current_value REAL,
+  last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-### Live Prices Section (Recently Rebuilt)
-**Location**: `/prices` route in `/src/index.tsx` (lines 5047-5711)
-
-**Key Features**:
-- Simple search interface with single input field
-- Real-time asset search with `/api/assets/search` endpoint
-- Direct watchlist integration with add/remove functionality
-- Responsive glass card design matching GusBit branding
-- Support for stocks, ETFs, and cryptocurrency
-
-**JavaScript Functions**:
-```javascript
-searchAsset()        // Main search function using axios
-showAssetInfo()      // Display search results
-addToWatchlist()     // Add asset to user's watchlist
-quickSearch()        // Pre-filled search for common assets
-loadWatchlist()      // Load and display current watchlist
+### **Watchlist (Seguimiento)**
+```sql
+CREATE TABLE watchlist (
+  id INTEGER PRIMARY KEY,
+  asset_symbol TEXT UNIQUE NOT NULL,
+  name TEXT,
+  category TEXT NOT NULL,
+  target_price REAL,
+  notes TEXT,
+  active_alerts BOOLEAN DEFAULT FALSE,
+  added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-**API Integration**:
-- Uses existing `/api/assets/search` endpoint
-- Results include: symbol, name, category, API source
-- Integrates with CoinGecko and Alpha Vantage APIs
-- Returns multiple matches ranked by relevance
+### **Assets (Precios)**
+```sql
+CREATE TABLE assets (
+  symbol TEXT PRIMARY KEY,
+  name TEXT,
+  current_price REAL,
+  price_change_24h REAL,
+  last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-## Deployment
-- **Platform**: Cloudflare Pages + Workers
-- **Status**: ✅ Active (Development)
-- **Tech Stack**: Hono + TypeScript + TailwindCSS + Cloudflare D1
-- **Build Command**: `npm run build`
-- **Dev Command**: `npm run dev:sandbox` (with PM2)
-- **Last Updated**: September 22, 2025 - Análisis de Decisiones Restoration
+## 🚀 Funcionalidades Recientes Implementadas
 
-## Recently Completed Features ✅ (September 21, 2025)
-- **✅ Header Estandarization**: Unified modern header design across all sections
-  - All pages now use the same elegant GusBit logo with GB initials and tagline
-  - Consistent navigation menu with proper active states
-  - Modern nav-modern class styling throughout the application
-  - Complete navigation includes: Dashboard, Transacciones, Portfolio, Importar, Markets, Watchlist
-- **✅ CSV Import Functionality**: Complete system for importing historical data
-  - New /import page with file upload interface
-  - Automatic daily snapshots replacement (preserves transactions)
-  - CSV format validation and error reporting
-  - Import status and statistics display
-  - Database migration for enhanced transaction fields
+### ✅ **Fixes Críticos (Septiembre 2024)**
+1. **BTC Price Fix** - Corregido precio de $45K hardcoded a ~$112K real
+2. **Exploration Mode** - Nueva página para activos no poseídos
+3. **Unique Charts** - Cada activo muestra gráfica específica (no idénticas)
+4. **CoinGecko Integration** - Datos reales para criptomonedas principales
+5. **Markets Restoration** - Formato original con noticias e indicadores
 
-## Features Not Yet Implemented
-- Real-time price updates (currently on-demand)
-- Price alerts and notifications
-- Advanced portfolio analytics (historical performance, Sharpe ratio, etc.)
-- Mobile app version
-- Portfolio benchmarking against market indices
+### 🎯 **Modo Exploración**
+- **Propósito:** Ver información de activos sin agregarlos al portafolio
+- **Datos:** APIs externas + gráficas históricas reales
+- **Timeframes:** 1D, 1W, 1M, 1Y con datos únicos por activo
+- **Acciones:** Agregar a watchlist, configurar alertas
 
-## Recommended Next Steps
-1. **User Testing**: Test the enhanced dashboard functionality thoroughly
-2. **Real-time Updates**: Implement WebSocket for live price feeds in dashboard
-3. **Enhanced Analytics**: Add advanced portfolio metrics (ROI, volatility, etc.)
-4. **Mobile Optimization**: Improve responsive design for mobile devices
-5. **Performance Optimization**: Implement caching for portfolio evolution data
-6. **Production Deployment**: Deploy to Cloudflare Pages for production use
+## 🛠️ Desarrollo Local
 
-## Development Commands
-
-### Local Development
 ```bash
-npm install                    # Install dependencies
-npm run build                  # Build for development
-npm run dev:sandbox           # Start with PM2 (sandbox)
-npm run dev                   # Start with Vite (local)
+# 1. Instalar dependencias
+npm install
+
+# 2. Configurar base de datos local
+npm run db:migrate:local
+npm run db:seed
+
+# 3. Build del proyecto
+npm run build
+
+# 4. Ejecutar en desarrollo
+npm run dev:sandbox  # Para sandbox (PM2)
+npm run dev          # Para desarrollo local (Vite)
+
+# 5. Testing
+npm run test         # curl http://localhost:3000
 ```
 
-### Database Management
+## ☁️ Deployment
+
+### **Cloudflare Pages**
 ```bash
-npm run db:migrate:local      # Apply migrations locally
-npm run db:seed               # Seed test data
-npm run db:reset              # Reset local database
+# Build y deploy
+npm run build
+npx wrangler pages deploy dist --project-name gusbit-financial-tracker
+
+# Con database
+npx wrangler d1 migrations apply webapp-production
 ```
 
-### Deployment
+### **GitHub Integration**
 ```bash
-npm run deploy                # Deploy to Cloudflare Pages
-npm run cf-typegen           # Generate TypeScript types
+# Setup GitHub (primer uso)
+setup_github_environment
+
+# Push cambios
+git add .
+git commit -m "Update description"
+git push origin main
 ```
 
-### Server Management
-```bash
-pm2 list                     # List PM2 processes
-pm2 logs webapp --nostream   # Check logs safely
-pm2 restart webapp           # Restart server
-```
+## 📱 Guía de Usuario
+
+### 🎯 **Para Watchlist**
+1. Agregar activos que quieres monitorear (no necesitas poseerlos)
+2. Configurar precios objetivo y alertas
+3. Hacer clic en "Analizar" para ver datos externos completos
+4. El sistema te llevará al modo exploración (no al portafolio)
+
+### 📊 **Para Portfolio**
+1. Agregar transacciones de compra/venta
+2. Ver rendimiento en tiempo real
+3. Análisis de ganancias/pérdidas
+4. Histórico completo de movimientos
+
+### 📰 **Para Markets**
+1. Noticias financieras actualizadas
+2. Indicadores económicos (S&P 500, VIX, DXY, BTC)
+3. Trending assets y recomendaciones
+4. Fear & Greed Index
+
+## 🔐 Configuración y Seguridad
+
+- **API Keys:** Almacenadas como secretos de Cloudflare
+- **Database:** Encriptada en Cloudflare D1
+- **CORS:** Configurado para dominios específicos
+- **Rate Limiting:** Implementado en endpoints críticos
+
+## 📈 Status del Proyecto
+
+- ✅ **Core Features:** Completamente funcionales
+- ✅ **Real-time Prices:** APIs conectadas
+- ✅ **Charts & Analytics:** Implementadas con datos únicos
+- ✅ **Cloud Ready:** Preparado para Cloudflare Pages
+- 🔄 **Continuous Updates:** APIs de mercado en tiempo real
+
+## 👨‍💻 Información Técnica
+
+- **Autor:** Sistema desarrollado para tracking financiero profesional
+- **Version:** 2.0.0 (Major Update - Sept 2024)
+- **Tech Stack:** Hono + Cloudflare + D1 + Chart.js + TailwindCSS
+- **Performance:** Edge computing para latencia mínima global
+- **Escalabilidad:** Arquitectura serverless autoscalable
+
+---
+
+## 🆘 Soporte y Updates
+
+El sistema está diseñado para ser auto-mantenible con updates automáticos de precios. Para modificaciones o nuevas features, el código está completamente documentado y modularizado.
+
+**¡Listo para deployment en la nube! 🚀**
