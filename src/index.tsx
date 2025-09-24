@@ -9579,22 +9579,7 @@ app.get('/wallet', (c) => {
             </div>
         </nav>
 
-        <div class="max-w-7xl mx-auto">
-        
         <!-- Main Content -->
-        <div class="px-8 py-12">
-            <!-- Executive Header -->
-            <div class="flex justify-between items-start mb-12">
-                <div>
-                    <h1 class="text-6xl font-bold text-white mb-3 tracking-tight drop-shadow-xl" style="text-shadow: 0 0 10px rgba(255,255,255,0.3), 0 0 20px rgba(59,130,246,0.2); filter: brightness(1.1);">Portfolio Executive</h1>
-                    <p class="executive-text-secondary font-medium text-lg">Gestión avanzada de inversiones</p>
-                    <div class="w-20 h-1 bg-blue-500 mt-4 rounded-full shadow-lg"></div>
-                </div>
-                <a href="/transactions" class="executive-bg-blue text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center executive-shadow font-medium">
-                    <i class="fas fa-plus mr-3"></i>
-                    Nueva Transacción
-                </a>
-            </div>
         <div class="max-w-7xl mx-auto px-6 py-8">
             <!-- Header -->
             <div class="text-center mb-12">
