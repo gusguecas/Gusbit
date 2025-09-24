@@ -488,19 +488,17 @@ body {
 
 /* Glass Card Effect - Enhanced for Watchlist */
 .glass-card {
-  background: rgba(15, 23, 42, 0.8) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 24px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
 }
 
-/* Watchlist specific glass cards - Ensure consistent dark theme */
+/* Watchlist specific glass cards - Pure white background */
 #watchlistContent .glass-card {
-  background: rgba(15, 23, 42, 0.8) !important;
-  backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3) !important;
+  background: #ffffff !important;
+  backdrop-filter: none;
 }
 
 /* Form Labels */
@@ -803,61 +801,61 @@ body {
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 2px 10px -2px rgba(59, 130, 246, 0.1);
 }
 
-/* Executive Text Colors - Dark Theme Style */
+/* Executive Text Colors - Lighter Gray */
 .executive-text-primary {
-  color: #f1f5f9 !important; /* Light text for dark backgrounds */
+  color: #6b7280 !important; /* Medium gray for better readability */
   text-shadow: none !important;
   font-weight: 600 !important;
 }
 
 .executive-text-secondary {
-  color: #cbd5e1 !important; /* Secondary light text */
+  color: #9ca3af !important; /* Light gray for secondary text */
   font-weight: 500 !important;
 }
 
-/* Watchlist Specific Text Improvements - Dark Theme */
+/* Watchlist Specific Text Improvements - Light Gray */
 .watchlist-text-primary {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #6b7280 !important;
   font-weight: 600 !important;
   text-shadow: none !important;
 }
 
 .watchlist-text-secondary {
-  color: #cbd5e1 !important; /* Secondary light text */
+  color: #9ca3af !important;
   font-weight: 500 !important;
 }
 
 .watchlist-text-accent {
-  color: #60a5fa !important; /* Blue accent */
+  color: #3b82f6 !important;
   font-weight: 600 !important;
 }
 
-/* Table Text Improvements - Dark Theme */
+/* Table Text Improvements - Light Gray */
 .table-text-dark {
-  color: #f1f5f9 !important; /* Light text for dark backgrounds */
+  color: #6b7280 !important;
   font-weight: 600 !important;
   text-shadow: none !important;
 }
 
 .table-text-medium {
-  color: #cbd5e1 !important; /* Secondary light text */
+  color: #9ca3af !important;
   font-weight: 500 !important;
 }
 
 /* Glass Card Text Override for Better Contrast */
 .glass-card .table-text-dark {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #1e293b !important;
   text-shadow: none;
 }
 
 .glass-card .watchlist-text-primary {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #1e293b !important;
   text-shadow: none;
 }
 
-/* Form Elements with Better Contrast - Dark Theme */
+/* Form Elements with Better Contrast */
 .form-label {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #1e293b !important;
   font-weight: 600;
 }
 
@@ -867,84 +865,28 @@ body {
   font-weight: 800 !important;
 }
 
-/* WATCHLIST PAGE GLOBAL TEXT OVERRIDES - Dark Theme */
+/* WATCHLIST PAGE GLOBAL TEXT OVERRIDES - Light Gray */
 #watchlistContent * {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #6b7280 !important;
 }
 
 #watchlistContent .text-slate-400,
 #watchlistContent .text-gray-500 {
-  color: #94a3b8 !important; /* Muted text */
+  color: #9ca3af !important;
   font-weight: 500 !important;
 }
 
-/* Remove conflicting watchlist glass card definition - using main definition above */
+#watchlistContent .glass-card {
+  background: rgba(255, 255, 255, 0.98) !important;
+}
 
-/* Force dark theme text in watchlist table */
+/* Force light gray text in watchlist table */
 #watchlistTable tbody td {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #6b7280 !important;
   font-weight: 600 !important;
 }
 
-/* Headers in watchlist - Dark Theme */
-#watchlistTable th {
-  color: #cbd5e1 !important; /* Secondary light text for headers */
-  font-weight: 600 !important;
-}
-
-/* Form inputs and selects - Dark Theme */
-.form-input, .form-select {
-  background: rgba(30, 41, 59, 0.7) !important;
-  border: 1px solid rgba(148, 163, 184, 0.3) !important;
-  color: #f1f5f9 !important;
-  border-radius: 8px;
-  padding: 8px 12px;
-}
-
-.form-input:focus, .form-select:focus {
-  border-color: rgba(59, 130, 246, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-  outline: none;
-}
-
-/* Button Styles - Dark Theme */
-.btn-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 10px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
-}
-
-.btn-secondary {
-  background: rgba(71, 85, 105, 0.8);
-  color: #f1f5f9;
-  padding: 10px 20px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
-
-.btn-secondary:hover {
-  background: rgba(100, 116, 139, 0.9);
-  border-color: rgba(148, 163, 184, 0.5);
-  transform: translateY(-1px);
-}
+/* Headers in watchlist */
 #watchlistContent h1,
 #watchlistContent h2, 
 #watchlistContent h3,
@@ -952,13 +894,13 @@ body {
 #watchlistContent p,
 #watchlistContent span,
 #watchlistContent div {
-  color: #f1f5f9 !important; /* Light text for dark theme */
+  color: #6b7280 !important;
   text-shadow: none !important;
 }
 
-/* Keep white text white in watchlist */
+/* Override any white text in watchlist */
 #watchlistContent .text-white {
-  color: #ffffff !important;
+  color: #6b7280 !important;
 }
 
 /* Executive Background Utilities */

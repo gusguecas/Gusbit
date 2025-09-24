@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Sept 21</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+</head>
+<body>
+    <div id="output"></div>
+    
+    <script>
+        async function testSept21() {
+            try {
+                console.log('Iniciando test...');
+                
+                const response = await axios.get('/api/wallet/asset/BTC');
+                const snapshots = response.data.daily_snapshots || [];
+                
+                console.log('Total snapshots:', snapshots.length);
+                
+                // Buscar datos del 21 de septiembre
+                const sept21Data = snapshots.find(s => s.snapshot_date === '2025-09-21');
+                
+                let result = '<h1>Debug del 21 de Septiembre</h1>';
+                result += '<p>Total snapshots: ' + snapshots.length + '</p>';
+                
+                if (sept21Data) {
+                    result += '<h2 style="color: green;">✅ ENCONTRADO!</h2>';
+                    result += '<pre>' + JSON.stringify(sept21Data, null, 2) + '</pre>';
+                } else {
+                    result += '<h2 style="color: red;">❌ NO ENCONTRADO!</h2>';
+                    
+                    // Mostrar las fechas disponibles
+                    result += '<h3>Fechas disponibles:</h3>';
+                    snapshots.forEach(s => {
+                        result += '<p>' + s.snapshot_date + '</p>';
+                    });
+                }
+                
+                document.getElementById('output').innerHTML = result;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('output').innerHTML = '<h2 style="color: red;">Error: ' + error.message + '</h2>';
+            }
+        }
+        
+        // Ejecutar cuando se carga la página
+        testSept21();
+    </script>
+</body>
+</html>
