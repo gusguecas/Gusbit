@@ -1,0 +1,1101 @@
+/* Asset Tracker - Modern Design System */
+
+/* ==========================================
+   CUSTOM COLOR PALETTE
+   ========================================== */
+:root {
+  /* Primary Blues */
+  --primary-blue: #1e40af;
+  --primary-blue-light: #3b82f6;
+  --primary-blue-dark: #1e3a8a;
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-600: #2563eb;
+  
+  /* Sophisticated Grays */
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+  
+  /* Success Greens */
+  --green-50: #f0fdf4;
+  --green-100: #dcfce7;
+  --green-200: #bbf7d0;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --green-700: #15803d;
+  
+  /* Alert Reds */
+  --red-50: #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-700: #b91c1c;
+  
+  /* Gradients */
+  --gradient-blue: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  --gradient-danger: linear-gradient(135deg, #ff5858 0%, #f857a6 100%);
+  --gradient-neutral: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+/* ==========================================
+   GLOBAL BACKGROUND & BASE STYLES - DARK EXECUTIVE
+   ========================================== */
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #f1f5f9;
+}
+
+/* Content wrapper with subtle background */
+.content-wrapper {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  margin: 20px;
+  overflow: hidden;
+}
+
+/* ==========================================
+   NAVIGATION STYLING
+   ========================================== */
+.nav-modern {
+  background: var(--gradient-blue);
+  border: none;
+  box-shadow: 0 10px 25px rgba(30, 64, 175, 0.3);
+}
+
+.nav-modern .nav-link {
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-radius: 10px;
+  padding: 8px 16px;
+  margin: 0 4px;
+}
+
+.nav-modern .nav-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.nav-modern .nav-link.active {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================
+   ASSET CARDS - MODERN DESIGN
+   ========================================== */
+.asset-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--gray-200);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.asset-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  border-color: var(--primary-blue-light);
+}
+
+.asset-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-blue);
+}
+
+/* Asset card categories with color coding */
+.asset-card.crypto::before {
+  background: var(--gradient-blue);
+}
+
+.asset-card.stocks::before {
+  background: var(--gradient-success);
+}
+
+.asset-card.etfs::before {
+  background: var(--gradient-neutral);
+}
+
+/* Asset card headers */
+.asset-card-header {
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+  padding: 20px;
+}
+
+.asset-symbol {
+  color: var(--gray-800);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.asset-name {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+/* ==========================================
+   PnL DISPLAYS WITH COLOR SYSTEM
+   ========================================== */
+.pnl-positive {
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  color: var(--green-700);
+  border-radius: 15px;
+  padding: 16px;
+}
+
+.pnl-negative {
+  background: var(--red-50);
+  border: 1px solid var(--red-200);
+  color: var(--red-700);
+  border-radius: 15px;
+  padding: 16px;
+}
+
+.pnl-neutral {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  color: var(--gray-700);
+  border-radius: 15px;
+  padding: 16px;
+}
+
+/* PnL icons with matching backgrounds */
+.pnl-icon-positive {
+  background: var(--green-100);
+  color: var(--green-600);
+  padding: 12px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pnl-icon-negative {
+  background: var(--red-100);
+  color: var(--red-600);
+  padding: 12px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================
+   BUTTONS - MODERN STYLING
+   ========================================== */
+.btn-modern-primary {
+  background: var(--gradient-blue);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+}
+
+.btn-modern-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 64, 175, 0.4);
+}
+
+.btn-modern-success {
+  background: var(--gradient-success);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.btn-modern-danger {
+  background: var(--gradient-danger);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+/* ==========================================
+   FORM ELEMENTS
+   ========================================== */
+.form-modern {
+  background: white;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+}
+
+.form-modern:focus {
+  border-color: var(--primary-blue-light);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.form-error {
+  border-color: var(--red-500) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.form-success {
+  border-color: var(--green-500) !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1) !important;
+}
+
+/* ==========================================
+   CATEGORY FILTERS
+   ========================================== */
+.category-filter {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.category-filter:hover {
+  background: var(--gray-200);
+  border-color: var(--gray-400);
+}
+
+.category-filter.active {
+  background: var(--gradient-blue);
+  color: white;
+  border-color: var(--primary-blue);
+  box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+}
+
+/* ==========================================
+   SEARCH RESULTS & DROPDOWNS
+   ========================================== */
+#searchResults {
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+
+#searchResults .search-result-item {
+  padding: 15px;
+  border-bottom: 1px solid var(--gray-100);
+  transition: all 0.2s ease;
+}
+
+#searchResults .search-result-item:hover {
+  background: var(--blue-50);
+  cursor: pointer;
+}
+
+/* ==========================================
+   TRANSACTION BADGES
+   ========================================== */
+.transaction-badge {
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 12px;
+  transition: all 0.2s ease;
+}
+
+.badge-buy {
+  background: var(--green-100);
+  color: var(--green-700);
+  border: 1px solid var(--green-200);
+}
+
+.badge-sell {
+  background: var(--red-100);
+  color: var(--red-700);
+  border: 1px solid var(--red-200);
+}
+
+.badge-trade {
+  background: var(--blue-100);
+  color: var(--blue-700);
+  border: 1px solid var(--blue-200);
+}
+
+/* ==========================================
+   TABLES - MODERN STYLING
+   ========================================== */
+.table-modern {
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--gray-200);
+}
+
+.table-modern th {
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-weight: 600;
+  border-bottom: 2px solid var(--gray-200);
+  padding: 16px;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-modern td {
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+
+.table-modern tr:hover {
+  background: var(--gray-50);
+}
+
+/* ==========================================
+   ANIMATIONS & TRANSITIONS
+   ========================================== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.6s ease-out;
+}
+
+/* ==========================================
+   LOADING STATES
+   ========================================== */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+@media (max-width: 768px) {
+  .content-wrapper {
+    margin: 10px;
+    border-radius: 15px;
+  }
+  
+  .asset-card {
+    border-radius: 15px;
+  }
+  
+  .table-modern th,
+  .table-modern td {
+    padding: 12px 8px;
+    font-size: 0.875rem;
+  }
+}
+
+/* ==========================================
+   CUSTOM SCROLLBARS
+   ========================================== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-500);
+}
+
+/* ==========================================
+   FORM COMPONENTS - TRANSACTION PAGE
+   ========================================== */
+
+/* Glass Card Effect - Enhanced for Watchlist */
+.glass-card {
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+}
+
+/* Watchlist specific glass cards - Ensure consistent dark theme */
+#watchlistContent .glass-card {
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Form Labels */
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+
+/* Form Inputs */
+.form-input {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  transform: translateY(-1px);
+}
+
+.form-input:hover {
+  border-color: var(--gray-300);
+}
+
+/* Form Select */
+.form-select {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 40px;
+  appearance: none;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* COLORED BUTTONS - FUNCTIONAL COLOR CODING */
+
+/* Primary Button (BLUE - Main Actions) */
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.4);
+}
+
+/* Secondary Button (GRAY - Neutral Actions) */
+.btn-secondary {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  color: var(--gray-700);
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: 2px solid var(--gray-300);
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-color: var(--gray-400);
+  transform: translateY(-1px);
+}
+
+/* Success Button (GREEN - Buy/Positive Actions) */
+.btn-success {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(34, 197, 94, 0.4);
+}
+
+/* Danger Button (RED - Sell/Delete Actions) */
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-weight: 600;
+  padding: 16px 32px;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(239, 68, 68, 0.4);
+}
+
+/* TRANSACTION TYPE INDICATORS */
+
+/* Buy Transaction Styling (GREEN) */
+.transaction-buy {
+  border-left: 4px solid var(--green-500);
+  background: linear-gradient(135deg, var(--green-50) 0%, #ffffff 100%);
+}
+
+.transaction-buy .transaction-type {
+  color: var(--green-600);
+  background: var(--green-100);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Sell Transaction Styling (RED) */
+.transaction-sell {
+  border-left: 4px solid var(--red-500);
+  background: linear-gradient(135deg, var(--red-50) 0%, #ffffff 100%);
+}
+
+.transaction-sell .transaction-type {
+  color: var(--red-600);
+  background: var(--red-100);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Trade Transaction Styling (BLUE) */
+.transaction-trade {
+  border-left: 4px solid var(--blue-600);
+  background: linear-gradient(135deg, var(--blue-50) 0%, #ffffff 100%);
+}
+
+.transaction-trade .transaction-type {
+  color: var(--blue-600);
+  background: var(--blue-100);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ASSET CATEGORY BADGES */
+.asset-badge-crypto {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.asset-badge-stocks {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.asset-badge-etfs {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Navigation Links */
+.nav-link {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  padding: 12px 20px;
+  margin: 0 4px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.nav-link.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================
+   ASSET QUICK BUTTONS - LIVE PRICES
+   ========================================== */
+.asset-quick-btn {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  z-index: 1; /* Low z-index to stay behind dropdown */
+}
+
+.asset-quick-btn:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary-blue);
+  box-shadow: 0 12px 25px rgba(37, 99, 235, 0.15);
+  background: white;
+}
+
+.asset-quick-btn:active {
+  transform: translateY(0);
+}
+
+/* Search dropdown - HIGHEST z-index */
+#priceSearchResults {
+  z-index: 9999 !important;
+  position: absolute !important;
+}
+
+/* ==========================================
+   EXECUTIVE THEME - PREMIUM STYLING
+   ========================================== */
+
+/* Executive Navigation - Dark */
+.nav-modern {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border: none;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+/* Executive Card Components - Dark */
+.executive-card {
+  background: linear-gradient(145deg, #1e293b 0%, #334155 100%);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.executive-border {
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.executive-shadow {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 2px 10px -2px rgba(59, 130, 246, 0.1);
+}
+
+/* Executive Text Colors - Dark Theme Style */
+.executive-text-primary {
+  color: #f1f5f9 !important; /* Light text for dark backgrounds */
+  text-shadow: none !important;
+  font-weight: 600 !important;
+}
+
+.executive-text-secondary {
+  color: #cbd5e1 !important; /* Secondary light text */
+  font-weight: 500 !important;
+}
+
+/* Watchlist Specific Text Improvements - Dark Theme */
+.watchlist-text-primary {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+  font-weight: 600 !important;
+  text-shadow: none !important;
+}
+
+.watchlist-text-secondary {
+  color: #cbd5e1 !important; /* Secondary light text */
+  font-weight: 500 !important;
+}
+
+.watchlist-text-accent {
+  color: #60a5fa !important; /* Blue accent */
+  font-weight: 600 !important;
+}
+
+/* Table Text Improvements - Dark Theme */
+.table-text-dark {
+  color: #f1f5f9 !important; /* Light text for dark backgrounds */
+  font-weight: 600 !important;
+  text-shadow: none !important;
+}
+
+.table-text-medium {
+  color: #cbd5e1 !important; /* Secondary light text */
+  font-weight: 500 !important;
+}
+
+/* Glass Card Text Override for Better Contrast */
+.glass-card .table-text-dark {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+  text-shadow: none;
+}
+
+.glass-card .watchlist-text-primary {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+  text-shadow: none;
+}
+
+/* Form Elements with Better Contrast - Dark Theme */
+.form-label {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+  font-weight: 600;
+}
+
+/* Badge improvements */
+.badge-text-dark {
+  color: #000000 !important;
+  font-weight: 800 !important;
+}
+
+/* WATCHLIST PAGE GLOBAL TEXT OVERRIDES - Dark Theme */
+#watchlistContent * {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+}
+
+#watchlistContent .text-slate-400,
+#watchlistContent .text-gray-500 {
+  color: #94a3b8 !important; /* Muted text */
+  font-weight: 500 !important;
+}
+
+/* Remove conflicting watchlist glass card definition - using main definition above */
+
+/* Force dark theme text in watchlist table */
+#watchlistTable tbody td {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+  font-weight: 600 !important;
+}
+
+/* Headers in watchlist - Dark Theme */
+#watchlistTable th {
+  color: #cbd5e1 !important; /* Secondary light text for headers */
+  font-weight: 600 !important;
+}
+
+/* Form inputs and selects - Dark Theme */
+.form-input, .form-select {
+  background: rgba(30, 41, 59, 0.7) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  color: #f1f5f9 !important;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  outline: none;
+}
+
+/* Button Styles - Dark Theme */
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(71, 85, 105, 0.8);
+  color: #f1f5f9;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-secondary:hover {
+  background: rgba(100, 116, 139, 0.9);
+  border-color: rgba(148, 163, 184, 0.5);
+  transform: translateY(-1px);
+}
+#watchlistContent h1,
+#watchlistContent h2, 
+#watchlistContent h3,
+#watchlistContent h4,
+#watchlistContent p,
+#watchlistContent span,
+#watchlistContent div {
+  color: #f1f5f9 !important; /* Light text for dark theme */
+  text-shadow: none !important;
+}
+
+/* Keep white text white in watchlist */
+#watchlistContent .text-white {
+  color: #ffffff !important;
+}
+
+/* Executive Background Utilities */
+.executive-bg-blue {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+/* Executive Chart Containers */
+.executive-chart {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Executive Button Variants */
+.executive-btn {
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  transition: all 0.2s ease;
+}
+
+.executive-btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 3px 12px -1px rgba(37, 99, 235, 0.3);
+}
+
+.executive-btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -1px rgba(37, 99, 235, 0.4);
+}
+
+.executive-btn-secondary {
+  background: linear-gradient(145deg, #334155 0%, #475569 100%);
+  color: #f1f5f9;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.executive-btn-secondary:hover {
+  background: linear-gradient(145deg, #475569 0%, #64748b 100%);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Executive Asset Cards - Dark */
+.executive-asset-item {
+  background: linear-gradient(145deg, #334155 0%, #475569 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.executive-asset-item:hover {
+  background: linear-gradient(145deg, #475569 0%, #64748b 100%);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px -2px rgba(59, 130, 246, 0.2);
+}
+
+/* Executive Transaction Items - Dark */
+.executive-transaction {
+  background: linear-gradient(145deg, #334155 0%, #475569 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.executive-transaction:hover {
+  background: linear-gradient(145deg, #475569 0%, #64748b 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Executive Status Indicators */
+.executive-status-positive {
+  color: #059669;
+  background: #d1fae5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.executive-status-negative {
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.executive-status-neutral {
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Executive Typography */
+.executive-heading {
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  color: #1e293b;
+}
+
+.executive-subheading {
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* Executive Accent Line */
+.executive-accent {
+  height: 3px;
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+  border-radius: 2px;
+}
+
+/* Executive Mobile Responsive */
+@media (max-width: 768px) {
+  .executive-card {
+    padding: 20px !important;
+  }
+  
+  .executive-text-primary {
+    font-size: 1.5rem !important;
+  }
+  
+  .executive-heading {
+    font-size: 1.75rem !important;
+  }
+}
