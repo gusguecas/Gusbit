@@ -35,9 +35,6 @@ app.use('/static/*', serveStatic({ root: './public' }))
 // AUTHENTICATION MIDDLEWARE
 // ============================================
 const authMiddleware = async (c: any, next: any) => {
-  // TEMPORAL: Deshabilitado para desarrollo
-  return next()
-  
   const url = new URL(c.req.url)
   
   // Skip auth for login page, API endpoints, and special routes
