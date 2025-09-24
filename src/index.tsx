@@ -9575,6 +9575,10 @@ app.get('/wallet', (c) => {
                             </a>
                         </nav>
                     </div>
+                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
+                        <i class="fas fa-power-off mr-2"></i>
+                        Salir
+                    </button>
                 </div>
             </div>
         </nav>
