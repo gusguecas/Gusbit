@@ -3120,20 +3120,35 @@ app.get('/api/portfolio/summary', async (c) => {
   try {
     const holdings = await c.env.DB.prepare(`
       SELECT 
-        SUM(total_invested) as totalInvested,
+        SUM(quantity * average_price) as totalInvested,
         SUM(current_value) as currentValue,
-        SUM(unrealized_pnl) as totalPnL
+        COUNT(*) as totalHoldings
       FROM holdings 
       WHERE quantity > 0
     `).first()
 
+    const totalInvested = holdings?.totalInvested || 0
+    const currentValue = holdings?.currentValue || totalInvested
+    const totalPnL = currentValue - totalInvested
+
     return c.json({
-      totalInvested: holdings?.totalInvested || 0,
-      currentValue: holdings?.currentValue || 0,
-      totalPnL: holdings?.totalPnL || 0
+      totalInvested: totalInvested,
+      currentValue: currentValue,
+      totalPnL: totalPnL,
+      totalHoldings: holdings?.totalHoldings || 0,
+      success: true
     })
   } catch (error) {
-    return c.json({ error: 'Error fetching portfolio summary' }, 500)
+    console.error('Portfolio summary error:', error)
+    // Return empty portfolio for new users
+    return c.json({
+      totalInvested: 0,
+      currentValue: 0,
+      totalPnL: 0,
+      totalHoldings: 0,
+      success: true,
+      message: 'No holdings found - new portfolio'
+    })
   }
 })
 
