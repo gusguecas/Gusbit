@@ -263,7 +263,7 @@ app.get('/login', (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation Executive Header -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -276,13 +276,11 @@ app.get('/login', (c) => {
                                     <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
                                         <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
                                     </div>
-                                    
                                     <!-- GusBit con el mismo estilo tipográfico -->
                                     <div class="-mt-1">
                                         <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
                                             GusBit
                                         </h1>
-                                        
                                         <!-- Tagline con spacing perfecto -->
                                         <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
                                             TRACK STOCKS<br>
@@ -1407,7 +1405,7 @@ app.get('/', (c) => {
     <body class="min-h-screen">
         <link href="/static/styles.css" rel="stylesheet">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -1465,6 +1463,9 @@ app.get('/', (c) => {
                                 <i class="fas fa-crosshairs mr-2"></i>
                                 Watchlist
                             </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
                             </a>
                         </nav>
                     </div>
@@ -4286,7 +4287,7 @@ app.get('/transactions', (c) => {
     </head>
     <body class="min-h-screen">
     
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -6489,7 +6490,7 @@ app.get('/import', (c) => {
     </head>
     <body class="min-h-screen">
     
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -8152,7 +8153,7 @@ app.get('/asset/:symbol', (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -9510,7 +9511,7 @@ app.get('/wallet', (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -9894,7 +9895,7 @@ app.get('/asset/:symbol', (c) => {
         <link href="/static/styles.css" rel="stylesheet">
     </head>
     <body class="bg-slate-700 bg-opacity-50 min-h-screen">
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="bg-white shadow-sm border-b">
             <div class="max-w-7xl mx-auto px-6 py-4">
                 <div class="flex justify-between items-center">
@@ -11463,7 +11464,7 @@ app.get('/crypto', async (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -12289,7 +12290,7 @@ app.get('/prices', async (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -13184,7 +13185,7 @@ app.get('/prices-with-complex-js', async (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -15248,7 +15249,7 @@ app.get('/crypto', async (c) => {
     </head>
     <body class="min-h-screen">
         
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -16051,7 +16052,7 @@ app.get('/watchlist', (c) => {
         <link href="/static/styles.css" rel="stylesheet">
     </head>
     <body class="bg-slate-700 bg-opacity-50 min-h-screen">
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
@@ -17329,7 +17330,7 @@ app.get('/explore/:symbol', async (c) => {
         <link href="/static/styles.css" rel="stylesheet">
     </head>
     <body class="bg-slate-700 bg-opacity-50 min-h-screen">
-        <!-- Navigation -->
+        <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
                 <div class="flex justify-between items-center">
