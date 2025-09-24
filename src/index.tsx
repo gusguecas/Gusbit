@@ -5669,10 +5669,10 @@ app.get('/api/wallet/holdings', async (c) => {
         h.*,
         a.name,
         a.category,
-        a.subcategory,
         a.current_price,
         a.price_updated_at,
-        ((h.current_value - h.total_invested) / h.total_invested) * 100 as pnl_percentage
+        (h.quantity * h.average_price) as total_invested,
+        ((h.current_value - (h.quantity * h.average_price)) / (h.quantity * h.average_price)) * 100 as pnl_percentage
       FROM holdings h
       JOIN assets a ON h.asset_symbol = a.symbol
       WHERE h.quantity > 0
