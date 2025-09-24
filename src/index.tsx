@@ -18311,7 +18311,7 @@ app.get('/analysis', async (c) => {
       SELECT t.*, a.name as asset_name
       FROM transactions t
       LEFT JOIN assets a ON t.asset_symbol = a.symbol
-      WHERE t.type = 'buy'
+      WHERE t.transaction_type = 'buy'
       ORDER BY t.transaction_date DESC
     `).all()
 
@@ -18481,6 +18481,47 @@ app.get('/analysis', async (c) => {
               const transactions = ${JSON.stringify(buyTransactions.results || [])};
               let currentPrices = {};
               
+              // Función para obtener URLs de logos (igual que en otras secciones)
+              function getAssetLogoUrl(symbol, category) {
+                  try {
+                      if (category === 'crypto') {
+                          const cryptoLogos = {
+                              'BTC': 'https://coin-images.coingecko.com/coins/images/1/thumb/bitcoin.png',
+                              'ETH': 'https://coin-images.coingecko.com/coins/images/279/thumb/ethereum.png',
+                              'ADA': 'https://coin-images.coingecko.com/coins/images/975/thumb/cardano.png',
+                              'SUI': 'https://coin-images.coingecko.com/coins/images/26375/thumb/sui-ocean-square.png',
+                              'SOL': 'https://coin-images.coingecko.com/coins/images/4128/thumb/solana.png',
+                              'DOT': 'https://coin-images.coingecko.com/coins/images/12171/thumb/polkadot.png',
+                              'LINK': 'https://coin-images.coingecko.com/coins/images/877/thumb/chainlink-new-logo.png',
+                              'UNI': 'https://coin-images.coingecko.com/coins/images/12504/thumb/uniswap-uni.png',
+                              'MATIC': 'https://coin-images.coingecko.com/coins/images/4713/thumb/matic-token-icon.png',
+                              'AVAX': 'https://coin-images.coingecko.com/coins/images/12559/thumb/avalanche-avax-logo.png',
+                              'ATOM': 'https://coin-images.coingecko.com/coins/images/1481/thumb/cosmos_hub.png',
+                              'XRP': 'https://coin-images.coingecko.com/coins/images/44/thumb/xrp-symbol-white-128.png'
+                          };
+                          return cryptoLogos[symbol] || null;
+                      } else {
+                          const stockLogos = {
+                              'AAPL': 'https://logo.clearbit.com/apple.com',
+                              'MSFT': 'https://logo.clearbit.com/microsoft.com',
+                              'GOOGL': 'https://logo.clearbit.com/google.com',
+                              'TSLA': 'https://logo.clearbit.com/tesla.com',
+                              'AMZN': 'https://logo.clearbit.com/amazon.com',
+                              'META': 'https://logo.clearbit.com/meta.com',
+                              'NFLX': 'https://logo.clearbit.com/netflix.com',
+                              'NVDA': 'https://logo.clearbit.com/nvidia.com',
+                              'SPY': 'https://logo.clearbit.com/spdr.com',
+                              'QQQ': 'https://logo.clearbit.com/invesco.com',
+                              'VTI': 'https://logo.clearbit.com/vanguard.com'
+                          };
+                          return stockLogos[symbol] || null;
+                      }
+                  } catch (error) {
+                      console.error('Error getting logo URL:', error);
+                      return null;
+                  }
+              }
+              
               // Obtener precios actuales para todos los activos
               async function fetchAllCurrentPrices() {
                   const assets = [...new Set(transactions.map(t => t.asset_symbol))];
@@ -18535,12 +18576,17 @@ app.get('/analysis', async (c) => {
                       const row = document.createElement('tr');
                       row.className = 'border-b border-slate-700 hover:bg-slate-800 hover:bg-opacity-50 transition-colors duration-200';
                       
+                      const logoUrl = getAssetLogoUrl(tx.asset_symbol, 'crypto'); // Use real logos like other sections
+                      
                       row.innerHTML = \`
                           <td class="py-4 px-6">
                               <div class="flex items-center">
-                                  <div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mr-3">
-                                      <span class="text-white text-xs font-bold">\${tx.asset_symbol.substring(0,2)}</span>
-                                  </div>
+                                  \${logoUrl ? 
+                                      '<img src="' + logoUrl + '" alt="' + tx.asset_symbol + '" class="w-8 h-8 rounded-full mr-3" onerror="this.style.display=\\'none\\'; this.nextElementSibling.style.display=\\'flex\\'">' +
+                                      '<div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mr-3" style="display:none;"><span class="text-white text-xs font-bold">' + tx.asset_symbol.substring(0,2) + '</span></div>'
+                                      : 
+                                      '<div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mr-3"><span class="text-white text-xs font-bold">' + tx.asset_symbol.substring(0,2) + '</span></div>'
+                                  }
                                   <span class="text-white font-semibold">\${tx.asset_symbol}</span>
                               </div>
                           </td>
