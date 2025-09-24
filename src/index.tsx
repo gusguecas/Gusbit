@@ -6496,7 +6496,7 @@ app.get('/import', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit -->
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
                                 <div class="flex flex-col items-start">
                                     <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
                                         <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
@@ -12296,7 +12296,7 @@ app.get('/prices', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit -->
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
                                 <div class="flex flex-col items-start">
                                     <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
                                         <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
@@ -12315,19 +12315,36 @@ app.get('/prices', async (c) => {
                         </div>
                         <nav class="hidden md:flex space-x-2">
                             <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>Dashboard
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Dashboard
                             </a>
                             <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>Transacciones
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
                             </a>
                             <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>Portfolio
+                                <i class="fas fa-briefcase mr-2"></i>
+                                Portfolio
+                            </a>
+                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-upload mr-2"></i>
+                                Importar
                             </a>
                             <a href="/prices" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>Markets
+                                <i class="fas fa-chart-area mr-2"></i>
+                                Markets
+                            </a>
+                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fab fa-bitcoin mr-2"></i>
+                                Crypto Hub
                             </a>
                             <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>Watchlist
+                                <i class="fas fa-crosshairs mr-2"></i>
+                                Watchlist
+                            </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
                             </a>
                         </nav>
                     </div>
@@ -17319,7 +17336,7 @@ app.get('/explore/:symbol', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit -->
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
                                 <div class="flex flex-col items-start">
                                     <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
                                         <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
@@ -18349,48 +18366,77 @@ app.get('/analysis', async (c) => {
       </head>
       <body class="min-h-screen executive-bg">
           <div class="overlay-pattern">
-              <!-- Header -->
-              <header class="px-8 py-6">
-                  <div class="flex items-center justify-between">
-                      <div class="flex items-center">
-                          <div class="text-3xl font-black text-white bg-blue-600 rounded-lg p-3 mr-4 executive-shadow">GB</div>
-                          <div>
-                              <h1 class="text-2xl font-bold text-white">GusBit</h1>
-                              <p class="text-slate-400 text-sm">Track Stocks, ETFs & Crypto</p>
-                          </div>
-                      </div>
-                      <nav class="flex items-center space-x-2">
-                          <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                              <i class="fas fa-chart-area mr-2"></i>
-                              Dashboard
-                          </a>
-                          <a href="/portfolio" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                              <i class="fas fa-briefcase mr-2"></i>
-                              Portfolio
-                          </a>
-                          <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                              <i class="fas fa-upload mr-2"></i>
-                              Importar
-                          </a>
-                          <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                              <i class="fas fa-chart-area mr-2"></i>
-                              Markets
-                          </a>
-                          <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                              <i class="fas fa-star mr-2"></i>
-                              Watchlist
-                          </a>
-                          <a href="/analysis" class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all font-medium text-sm">
-                              <i class="fas fa-chart-line mr-2"></i>
-                              Análisis
-                          </a>
-                      </nav>
-                      <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                          <i class="fas fa-power-off mr-2"></i>
-                          Salir
-                      </button>
-                  </div>
-              </header>
+        <!-- Navigation Executive Header -->
+        <nav class="nav-modern">
+            <div class="max-w-7xl mx-auto px-8 py-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-12">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-4">
+                                <!-- Logo GusBit con tipografía y spacing optimizados -->
+                                <div class="flex flex-col items-start">
+                                    <!-- GB con formas exactas y spacing perfecto -->
+                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
+                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
+                                    </div>
+                                    
+                                    <!-- GusBit con el mismo estilo tipográfico -->
+                                    <div class="-mt-1">
+                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                                            GusBit
+                                        </h1>
+                                        
+                                        <!-- Tagline con spacing perfecto -->
+                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                                            TRACK STOCKS<br>
+                                            ETFS &amp; CRYPTO
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <nav class="hidden md:flex space-x-2">
+                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Dashboard
+                            </a>
+                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Transacciones
+                            </a>
+                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-briefcase mr-2"></i>
+                                Portfolio
+                            </a>
+                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-upload mr-2"></i>
+                                Importar
+                            </a>
+                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-area mr-2"></i>
+                                Markets
+                            </a>
+                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fab fa-bitcoin mr-2"></i>
+                                Crypto Hub
+                            </a>
+                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-crosshairs mr-2"></i>
+                                Watchlist
+                            </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
+                            </a>
+                        </nav>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
+                        <i class="fas fa-power-off mr-2"></i>
+                        Salir
+                    </button>
+                </div>
+            </div>
+        </nav>
 
               <!-- Main Content -->
               <div class="max-w-7xl mx-auto">
