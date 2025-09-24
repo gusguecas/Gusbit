@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Executive Theme CSS - Custom styles for production build */
+:root {
+  --executive-bg-primary: #0f172a;
+  --executive-bg-secondary: #1e293b;
+  --executive-border: rgba(148, 163, 184, 0.1);
+  --executive-text-primary: #f1f5f9;
+  --executive-text-secondary: #94a3b8;
+}
+
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  color: var(--executive-text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.nav-modern {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--executive-border);
+}
+
+.executive-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.executive-border {
+  border-color: var(--executive-border);
+}
+
+.executive-text-primary {
+  color: var(--executive-text-primary);
+}
+
+.executive-text-secondary {
+  color: var(--executive-text-secondary);
+}
+
+.executive-bg-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.executive-shadow {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(59, 130, 246, 0.1);
+}
+
+.executive-transaction {
+  background: rgba(51, 65, 85, 0.3);
+  border: 1px solid var(--executive-border);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.executive-transaction:hover {
+  background: rgba(51, 65, 85, 0.5);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.executive-status-positive {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.executive-status-negative {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.executive-status-neutral {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
