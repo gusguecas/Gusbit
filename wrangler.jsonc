@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "webapp-production",
-      "database_id": "placeholder-will-be-replaced-when-deploying"
+      "database_name": "gusbit-production",
+      "database_id": "8859b58d-2684-41a8-81e4-e6c14bb209e0"
     }
   ]
 }
