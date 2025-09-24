@@ -321,6 +321,10 @@ app.get('/login', (c) => {
                                 <i class="fas fa-crosshairs mr-2"></i>
                                 Watchlist
                             </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
+                            </a>
                         </nav>
                     </div>
                     <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
@@ -4340,6 +4344,10 @@ app.get('/transactions', (c) => {
                                 <i class="fas fa-crosshairs mr-2"></i>
                                 Watchlist
                             </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
+                            </a>
                         </nav>
                     </div>
                     <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
@@ -6533,6 +6541,10 @@ app.get('/import', (c) => {
                             <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-crosshairs mr-2"></i>
                                 Watchlist
+                            </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
                             </a>
                         </nav>
                     </div>
@@ -9555,6 +9567,10 @@ app.get('/wallet', (c) => {
                             <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-crosshairs mr-2"></i>
                                 Watchlist
+                            </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
                             </a>
                         </nav>
                     </div>
@@ -13208,6 +13224,10 @@ app.get('/prices-with-complex-js', async (c) => {
                             <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
                                 <i class="fas fa-crosshairs mr-2"></i>
                                 Watchlist
+                            </a>
+                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                                <i class="fas fa-chart-line mr-2"></i>
+                                Análisis
                             </a>
                         </nav>
                     </div>
