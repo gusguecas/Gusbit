@@ -51,6 +51,7 @@ async function initializeDatabase(DB: D1Database) {
           name TEXT,
           category TEXT NOT NULL,
           target_price REAL,
+          alert_percent REAL,
           notes TEXT,
           active_alerts BOOLEAN DEFAULT FALSE,
           added_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -62,6 +63,7 @@ async function initializeDatabase(DB: D1Database) {
         CREATE TABLE IF NOT EXISTS assets (
           symbol TEXT PRIMARY KEY,
           name TEXT,
+          category TEXT,
           current_price REAL,
           price_change_24h REAL,
           last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -91,6 +93,17 @@ async function initializeDatabase(DB: D1Database) {
         )
       `)
     ])
+    
+    // Add missing columns (migrations)
+    try {
+      await DB.prepare(`ALTER TABLE watchlist ADD COLUMN alert_percent REAL`).run()
+      console.log('✅ Added alert_percent column to watchlist table')
+    } catch (error) {
+      // Column already exists, ignore
+      if (!error.message.includes('duplicate column name')) {
+        console.log('⚠️ Could not add alert_percent column:', error.message)
+      }
+    }
     
     // Insert default config values
     await DB.prepare(`
@@ -147,9 +160,15 @@ app.options('*', (c) => {
 app.use('/static/*', serveStatic({ root: './public' }))
 
 // Serve specific root files
-app.get('/favicon.ico', serveStatic({ path: './public/favicon.ico' }))
-app.get('/favicon.png', serveStatic({ path: './public/favicon.png' }))
-app.get('/favicon.svg', serveStatic({ path: './public/favicon.svg' }))
+// Serve static files
+app.use('/static/*', serveStatic({ root: './public' }))
+app.get('/favicon.ico', async (c) => {
+  try {
+    return new Response(null, { status: 204 })
+  } catch {
+    return c.notFound()
+  }
+})
 
 // ============================================
 // AUTHENTICATION MIDDLEWARE
@@ -256,7 +275,7 @@ app.get('/login', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Login</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -270,109 +289,171 @@ app.get('/login', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
 
-        <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-8 py-12 flex items-center justify-center min-h-screen">
-            <div class="executive-card executive-border rounded-2xl p-10 w-full max-w-md executive-shadow">
-                <div class="text-center mb-8">
-                    <h2 class="text-3xl font-light executive-text-primary mb-3 tracking-tight">Acceso Ejecutivo</h2>
-                    <p class="executive-text-secondary text-sm font-medium">Ingresa tu contraseña para continuar</p>
-                    <div class="w-16 h-1 bg-blue-500 mt-4 rounded-full mx-auto"></div>
-                </div>
-            
-            <!-- Notification for cleared cookies -->
-            <div id="clearNotification" class="mb-6 p-4 bg-emerald-900 bg-opacity-30 border border-emerald-500 border-opacity-50 text-emerald-300 rounded-xl hidden">
-                <i class="fas fa-check-circle mr-2"></i>
-                Cookies limpiadas. Ingresa tu contraseña nuevamente.
-            </div>
-            
-            <form id="loginForm" class="space-y-8">
-                <div>
-                    <label class="block text-sm font-semibold executive-text-primary mb-3 tracking-wide">Contraseña de Acceso</label>
-                    <div class="relative">
-                        <input 
-                            type="password" 
-                            id="password" 
-                            class="w-full px-6 py-4 bg-slate-700 bg-opacity-50 border border-blue-500 border-opacity-30 rounded-xl text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-opacity-70 transition-all"
-                            placeholder="Ingresa tu contraseña ejecutiva"
-                            required
-                        >
-                        <i class="fas fa-lock absolute right-4 top-4 text-slate-400"></i>
+        <!-- LOGIN PROFESIONAL CHINGÓN -->
+        <div class="min-h-screen flex items-center justify-center py-12 px-4">
+            <div class="relative max-w-md w-full">
+                
+                <!-- LOGO GIGANTE PROFESIONAL -->
+                <div class="text-center mb-12">
+                    <!-- Logo PNG Profesional -->
+                    <div class="mb-8 relative">
+                        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-cyan-500/30 to-purple-500/20 blur-3xl opacity-75 animate-pulse"></div>
+                        <img src="/static/logo.png" alt="GusBit" class="relative h-32 w-auto mx-auto drop-shadow-2xl transform hover:scale-105 transition-all duration-500">
+                    </div>
+                    
+                    <!-- Título Espectacular -->
+                    <div class="mb-4">
+                        <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-purple-400 mb-2 tracking-tight animate-pulse">
+                            GusBit
+                        </h1>
+                        <div class="text-xl font-bold text-slate-300 mb-2 tracking-widest">
+                            FINANCIAL TRACKER
+                        </div>
+                        <div class="text-sm font-medium text-slate-400 uppercase tracking-[0.2em]">
+                            Professional Trading Platform
+                        </div>
+                    </div>
+                    
+                    <!-- Línea Decorativa Espectacular -->
+                    <div class="relative w-48 h-1 mx-auto mb-8">
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400 to-transparent rounded-full"></div>
+                        <div class="absolute inset-0 bg-gradient-to-r from-blue-500 via-cyan-300 to-purple-500 rounded-full blur-sm opacity-50"></div>
                     </div>
                 </div>
                 
-                <button 
-                    type="submit" 
-                    class="w-full executive-bg-blue text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 executive-shadow"
-                >
-                    <i class="fas fa-sign-in-alt mr-3"></i>
-                    Acceso Ejecutivo
-                </button>
-                
-                <div id="error-message" class="text-red-400 text-sm text-center font-medium hidden"></div>
-            </form>
+                <!-- FORMULARIO DE LOGIN ELEGANTE -->
+                <div class="relative">
+                    <!-- Fondo Glassmorphism -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-slate-800/40 via-slate-700/30 to-slate-900/50 backdrop-blur-xl rounded-3xl border border-slate-600/30 shadow-2xl"></div>
+                    
+                    <!-- Efectos de Brillo -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-purple-500/10 rounded-3xl"></div>
+                    <div class="absolute -inset-1 bg-gradient-to-r from-blue-500/20 via-cyan-400/20 to-purple-500/20 rounded-3xl blur-sm opacity-50"></div>
+                    
+                    <!-- Contenido del Form -->
+                    <div class="relative p-8">
+                        <div class="text-center mb-8">
+                            <h2 class="text-2xl font-bold text-white mb-2">Acceso Ejecutivo</h2>
+                            <p class="text-slate-300 text-sm">Ingresa tus credenciales para continuar</p>
+                        </div>
+                        
+                        <!-- Notification for cleared cookies -->
+                        <div id="clearNotification" class="mb-6 p-4 bg-gradient-to-r from-emerald-800/30 via-emerald-700/20 to-emerald-800/30 border border-emerald-400/40 text-emerald-300 rounded-2xl backdrop-blur-sm hidden">
+                            <i class="fas fa-check-circle mr-2 text-emerald-400"></i>
+                            Cookies limpiadas. Ingresa tu contraseña nuevamente.
+                        </div>
+                        
+                        <form id="loginForm" class="space-y-8">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-300 mb-4 tracking-wider uppercase">Contraseña de Acceso</label>
+                                <div class="relative group">
+                                    <!-- Campo de Input Espectacular -->
+                                    <input 
+                                        type="password" 
+                                        id="password" 
+                                        class="w-full px-6 py-5 bg-slate-800/60 backdrop-blur-sm border-2 border-slate-600/40 rounded-2xl text-white placeholder-slate-400 focus:ring-4 focus:ring-cyan-500/30 focus:border-cyan-400 focus:bg-slate-800/80 transition-all duration-300 font-medium text-lg group-hover:border-slate-500/60"
+                                        placeholder="Ingresa tu contraseña ejecutiva"
+                                        required
+                                    >
+                                    <!-- Icono con Efectos -->
+                                    <div class="absolute right-5 top-1/2 transform -translate-y-1/2">
+                                        <i class="fas fa-shield-alt text-slate-400 text-xl group-hover:text-cyan-400 transition-all duration-300"></i>
+                                    </div>
+                                    <!-- Brillo en Focus -->
+                                    <div class="absolute inset-0 rounded-2xl bg-gradient-to-r from-cyan-500/0 via-blue-500/0 to-purple-500/0 group-focus-within:from-cyan-500/10 group-focus-within:via-blue-500/10 group-focus-within:to-purple-500/10 transition-all duration-500 pointer-events-none"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Botón de Login Espectacular -->
+                            <button 
+                                type="submit" 
+                                class="group relative w-full py-5 rounded-2xl font-bold text-lg overflow-hidden transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 focus:scale-105 focus:-translate-y-1"
+                            >
+                                <!-- Fondo Principal -->
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600 via-cyan-500 to-purple-600"></div>
+                                <!-- Efecto Hover -->
+                                <div class="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                <!-- Efecto de Brillo Deslizante -->
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                <!-- Shadow Glow -->
+                                <div class="absolute inset-0 rounded-2xl shadow-2xl shadow-cyan-500/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                
+                                <!-- Contenido del Botón -->
+                                <div class="relative flex items-center justify-center text-white">
+                                    <i class="fas fa-rocket mr-3 text-xl group-hover:rotate-45 group-hover:scale-110 transition-all duration-300"></i>
+                                    <span class="tracking-wider group-hover:tracking-widest transition-all duration-300">ACCESO EJECUTIVO</span>
+                                </div>
+                            </button>
+                            
+                            <div id="error-message" class="text-red-400 text-sm text-center font-medium hidden bg-red-900/20 p-3 rounded-xl border border-red-500/30"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <script>
@@ -382,10 +463,43 @@ app.get('/login', (c) => {
                 document.getElementById('clearNotification').classList.remove('hidden');
             }
             
+            // Efectos de entrada espectaculares
+            document.addEventListener('DOMContentLoaded', function() {
+                // Animación de entrada del logo
+                const logo = document.querySelector('img[alt="GusBit"]');
+                if (logo) {
+                    logo.style.transform = 'scale(0) rotate(180deg)';
+                    logo.style.opacity = '0';
+                    setTimeout(() => {
+                        logo.style.transition = 'all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                        logo.style.transform = 'scale(1) rotate(0deg)';
+                        logo.style.opacity = '1';
+                    }, 200);
+                }
+                
+                // Animación del formulario
+                const form = document.querySelector('.relative.max-w-md');
+                if (form) {
+                    form.style.transform = 'translateY(30px)';
+                    form.style.opacity = '0';
+                    setTimeout(() => {
+                        form.style.transition = 'all 0.6s ease-out';
+                        form.style.transform = 'translateY(0)';
+                        form.style.opacity = '1';
+                    }, 400);
+                }
+            });
+            
             document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const password = document.getElementById('password').value;
                 const errorDiv = document.getElementById('error-message');
+                const button = e.target.querySelector('button[type="submit"]');
+                
+                // Efecto de loading en el botón
+                const originalContent = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i><span class="tracking-wider">VERIFICANDO...</span>';
+                button.disabled = true;
                 
                 try {
                     const response = await fetch('/api/auth/login', {
@@ -397,17 +511,52 @@ app.get('/login', (c) => {
                     const data = await response.json();
                     
                     if (data.success) {
-                        window.location.href = '/';
+                        button.innerHTML = '<i class="fas fa-check mr-3"></i><span class="tracking-wider">¡ÉXITO!</span>';
+                        button.classList.add('bg-green-500');
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1000);
                     } else {
-                        errorDiv.textContent = data.message || 'Contraseña incorrecta';
+                        button.innerHTML = originalContent;
+                        button.disabled = false;
+                        errorDiv.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>' + (data.message || 'Contraseña incorrecta');
                         errorDiv.classList.remove('hidden');
+                        
+                        // Shake animation en error
+                        const form = document.getElementById('loginForm');
+                        form.style.animation = 'shake 0.5s';
+                        setTimeout(() => {
+                            form.style.animation = '';
+                        }, 500);
                     }
                 } catch (error) {
-                    errorDiv.textContent = 'Error de conexión';
+                    button.innerHTML = originalContent;
+                    button.disabled = false;
+                    errorDiv.innerHTML = '<i class="fas fa-wifi mr-2"></i>Error de conexión';
                     errorDiv.classList.remove('hidden');
                 }
             });
+            
+            // Añadir keyframes para la animación shake
+            const style = document.createElement('style');
+            style.textContent = '@keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }';
+            document.head.appendChild(style);
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -1344,7 +1493,7 @@ app.post('/api/watchlist/refresh-prices', async (c) => {
         if (newPrice && newPrice > 0) {
           await c.env.DB.prepare(`
             UPDATE assets 
-            SET current_price = ?, price_updated_at = CURRENT_TIMESTAMP
+            SET current_price = ?, last_updated = CURRENT_TIMESTAMP
             WHERE symbol = ?
           `).bind(newPrice, asset.symbol).run()
           
@@ -1396,7 +1545,7 @@ app.get('/', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Dashboard</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1412,67 +1561,66 @@ app.get('/', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
@@ -1494,8 +1642,12 @@ app.get('/', (c) => {
                         Nueva Transacción
                     </a>
                     <a href="/analysis" class="bg-green-600 text-white px-8 py-4 rounded-xl hover:bg-green-700 transition-all duration-200 flex items-center executive-shadow font-medium">
-                        <i class="fas fa-chart-line mr-3"></i>
+                        <i class="fas fa-chart-bar mr-3"></i>
                         Análisis de Decisiones
+                    </a>
+                    <a href="/import" class="bg-indigo-600 text-white px-8 py-4 rounded-xl hover:bg-indigo-700 transition-all duration-200 flex items-center executive-shadow font-medium">
+                        <i class="fas fa-upload mr-3"></i>
+                        Importar Datos
                     </a>
                 </div>
                 <a href="/transactions" class="executive-bg-blue text-white px-8 py-4 rounded-xl hover:bg-blue-700 transition-all duration-200 flex items-center executive-shadow font-medium" style="display:none;">
@@ -1574,7 +1726,7 @@ app.get('/', (c) => {
                             <i class="fas fa-chart-pie mr-2"></i>Overview
                         </button>
                         <button onclick="changePortfolioCategory('crypto')" class="flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all category-tab-btn text-slate-300 hover:bg-slate-700 hover:bg-opacity-50" data-category="crypto">
-                            <i class="fab fa-bitcoin mr-2"></i>Crypto
+                            <i class="fas fa-coins mr-2"></i>Crypto
                         </button>
                         <button onclick="changePortfolioCategory('stocks')" class="flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all category-tab-btn text-slate-300 hover:bg-slate-700 hover:bg-opacity-50" data-category="stocks">
                             <i class="fas fa-chart-bar mr-2"></i>Stocks
@@ -2819,7 +2971,7 @@ app.get('/', (c) => {
                     if (category === 'crypto') {
                         iconClass = 'fab fa-bitcoin';
                         borderColor = 'border-orange-500';
-                        bgColor = 'bg-orange-500';
+                        bgColor = 'bg-white';
                     } else if (category === 'stocks') {
                         iconClass = 'fas fa-chart-line';
                         borderColor = 'border-green-500';
@@ -3028,6 +3180,21 @@ app.get('/', (c) => {
                 }
             }
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -3079,7 +3246,7 @@ app.get('/api/price-history/:symbol', async (c) => {
         SELECT 
           DATE('now') as date,
           current_price as price,
-          price_updated_at as created_at
+          last_updated as created_at
         FROM assets 
         WHERE symbol = ?
       `
@@ -3422,6 +3589,21 @@ app.get('/clear-cache', (c) => {
                 window.location.href = '/?v=' + Date.now();
             }, 1000);
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -3942,7 +4124,7 @@ app.post('/api/transactions/trade', async (c) => {
       
       if (!existingAsset) {
         await c.env.DB.prepare(`
-          INSERT INTO assets (symbol, name, category, api_source, api_id, current_price, price_updated_at)
+          INSERT INTO assets (symbol, name, category, api_source, api_id, current_price, last_updated)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `).bind(
           asset.symbol,
@@ -4040,7 +4222,7 @@ app.post('/api/transactions', async (c) => {
     if (!asset) {
       // Create new asset
       await c.env.DB.prepare(`
-        INSERT INTO assets (symbol, name, category, api_source, api_id, current_price, price_updated_at)
+        INSERT INTO assets (symbol, name, category, api_source, api_id, current_price, last_updated)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         asset_symbol,
@@ -4055,11 +4237,10 @@ app.post('/api/transactions', async (c) => {
       // Update current price
       await c.env.DB.prepare(`
         UPDATE assets 
-        SET current_price = ?, price_updated_at = ?, updated_at = ?
+        SET current_price = ?, last_updated = ?
         WHERE symbol = ?
       `).bind(
         price_per_unit,
-        new Date().toISOString(),
         new Date().toISOString(),
         asset_symbol
       ).run()
@@ -4279,7 +4460,7 @@ app.get('/transactions', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Transacciones</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -4294,67 +4475,66 @@ app.get('/transactions', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
@@ -4450,7 +4630,7 @@ app.get('/transactions', (c) => {
                     <div id="tradeSection" class="lg:col-span-2 hidden">
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                             <h3 class="text-lg font-medium text-blue-800 mb-3">
-                                <i class="fas fa-exchange-alt mr-2"></i>
+                                <i class="fas fa-receipt mr-2"></i>
                                 Intercambio entre Activos
                             </h3>
                             <p class="text-blue-700 text-sm">Registra el intercambio directo entre dos de tus activos (ej: BTC → ETH)</p>
@@ -5423,7 +5603,7 @@ app.get('/transactions', (c) => {
                     '<div class="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">' +
                         '<div class="flex justify-between items-center">' +
                             '<h3 class="text-lg font-semibold text-gray-800">' +
-                                '<i class="fas fa-chart-line mr-2 text-blue-600"></i>' +
+                                '<i class="fas fa-tachometer-alt mr-2 text-blue-600"></i>' +
                                 'Todas las Transacciones (' + total + ')' +
                             '</h3>' +
                             '<div class="flex space-x-4 text-sm text-gray-600">' +
@@ -5659,6 +5839,21 @@ app.get('/transactions', (c) => {
                 }
             }
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -5668,19 +5863,63 @@ app.get('/transactions', (c) => {
 // API ROUTES - WALLET & HOLDINGS
 // ============================================
 
+// DEBUG: Check holdings table structure
+app.get('/api/debug/holdings-structure', async (c) => {
+  try {
+    // Check if holdings table exists and its structure
+    const holdingsTable = await c.env.DB.prepare(`
+      SELECT sql FROM sqlite_master WHERE type='table' AND name='holdings'
+    `).first()
+
+    // Check if assets table exists and its structure  
+    const assetsTable = await c.env.DB.prepare(`
+      SELECT sql FROM sqlite_master WHERE type='table' AND name='assets'
+    `).first()
+
+    // Count records in each table
+    const holdingsCount = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM holdings`).first()
+    const assetsCount = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM assets`).first()
+
+    // Get sample holdings data
+    const sampleHoldings = await c.env.DB.prepare(`SELECT * FROM holdings LIMIT 5`).all()
+
+    // Get sample assets data
+    const sampleAssets = await c.env.DB.prepare(`SELECT * FROM assets LIMIT 5`).all()
+
+    return c.json({
+      tables: {
+        holdings: holdingsTable?.sql || 'NOT FOUND',
+        assets: assetsTable?.sql || 'NOT FOUND'
+      },
+      counts: {
+        holdings: holdingsCount?.count || 0,
+        assets: assetsCount?.count || 0
+      },
+      samples: {
+        holdings: sampleHoldings?.results || [],
+        assets: sampleAssets?.results || []
+      }
+    })
+  } catch (error) {
+    return c.json({ error: 'Debug error: ' + error.message }, 500)
+  }
+})
+
 // Get all current holdings
 app.get('/api/wallet/holdings', async (c) => {
   try {
     const category = c.req.query('category') // 'crypto', 'stocks', 'etfs', or 'all'
     
+    // FIXED QUERY: Add missing unrealized_pnl calculation and use correct column names
     let query = `
       SELECT 
         h.*,
         a.name,
         a.category,
         a.current_price,
-        a.price_updated_at,
+        a.last_updated as last_updated,
         (h.quantity * h.average_price) as total_invested,
+        (h.current_value - (h.quantity * h.average_price)) as unrealized_pnl,
         ((h.current_value - (h.quantity * h.average_price)) / (h.quantity * h.average_price)) * 100 as pnl_percentage
       FROM holdings h
       JOIN assets a ON h.asset_symbol = a.symbol
@@ -5702,7 +5941,11 @@ app.get('/api/wallet/holdings', async (c) => {
       total_holdings: holdings.results.length
     })
   } catch (error) {
-    return c.json({ error: 'Error fetching holdings' }, 500)
+    console.error('Holdings API Error:', error)
+    return c.json({ 
+      error: 'Error fetching holdings: ' + error.message,
+      details: error.stack
+    }, 500)
   }
 })
 
@@ -5814,10 +6057,9 @@ app.get('/api/wallet/asset/:symbol', async (c) => {
         h.*,
         a.name,
         a.category,
-        a.subcategory,
         a.current_price,
-        a.price_updated_at,
-        ((h.current_value - h.total_invested) / h.total_invested) * 100 as pnl_percentage
+        a.last_updated as last_updated,
+        ((h.current_value - (h.quantity * h.average_price)) / (h.quantity * h.average_price)) * 100 as pnl_percentage
       FROM holdings h
       JOIN assets a ON h.asset_symbol = a.symbol
       WHERE h.asset_symbol = ?
@@ -5932,13 +6174,8 @@ app.get('/api/wallet/asset/:symbol', async (c) => {
       LIMIT 50
     `).bind(symbol).all()
     
-    // Get price history (if available)
-    const priceHistory = await c.env.DB.prepare(`
-      SELECT * FROM price_history 
-      WHERE asset_symbol = ? 
-      ORDER BY timestamp DESC
-      LIMIT 100
-    `).bind(symbol).all()
+    // Get price history (if available) - table doesn't exist yet, use empty array
+    const priceHistory = { results: [] }
     
     // Get daily snapshots from July 21, 2025 (with Mazatlán timezone - UTC-7)
     const dailySnapshots = await c.env.DB.prepare(`
@@ -5957,7 +6194,11 @@ app.get('/api/wallet/asset/:symbol', async (c) => {
       daily_snapshots: historicalData
     })
   } catch (error) {
-    return c.json({ error: 'Error fetching asset details' }, 500)
+    console.error('Asset details API error:', error)
+    return c.json({ 
+      error: 'Error fetching asset details: ' + error.message,
+      details: error.stack 
+    }, 500)
   }
 })
 
@@ -5995,7 +6236,7 @@ app.post('/api/wallet/update-prices', async (c) => {
         // Update asset price
         await c.env.DB.prepare(`
           UPDATE assets 
-          SET current_price = ?, price_updated_at = ?, updated_at = ?
+          SET current_price = ?, last_updated = ?
           WHERE symbol = ?
         `).bind(
           newPrice,
@@ -6268,9 +6509,7 @@ app.get('/api/watchlist', async (c) => {
       SELECT 
         w.*,
         a.current_price,
-        a.price_updated_at,
-        a.api_source,
-        a.api_id,
+        a.last_updated as last_updated,
         CASE 
           WHEN w.target_price IS NOT NULL AND a.current_price IS NOT NULL 
           THEN ((a.current_price - w.target_price) / w.target_price) * 100
@@ -6303,7 +6542,7 @@ app.get('/api/watchlist', async (c) => {
               // Update price in database
               await c.env.DB.prepare(`
                 UPDATE assets 
-                SET current_price = ?, price_updated_at = CURRENT_TIMESTAMP
+                SET current_price = ?, last_updated = CURRENT_TIMESTAMP
                 WHERE symbol = ?
               `).bind(currentPrice, item.asset_symbol).run()
             }
@@ -6337,14 +6576,17 @@ app.get('/api/watchlist', async (c) => {
         ...item,
         current_price: currentPrice,
         price_difference_percent: priceDifferencePercent,
-        price_updated_at: new Date().toISOString()
+        last_updated: new Date().toISOString()
       })
     }
     
     return c.json({ watchlist: updatedWatchlist })
   } catch (error) {
     console.error('Error fetching watchlist:', error)
-    return c.json({ error: 'Error fetching watchlist' }, 500)
+    return c.json({ 
+      error: 'Error fetching watchlist: ' + error.message,
+      details: error.stack 
+    }, 500)
   }
 })
 
@@ -6404,9 +6646,9 @@ app.post('/api/watchlist', async (c) => {
     }
     
     await c.env.DB.prepare(`
-      INSERT OR IGNORE INTO assets (symbol, name, category, api_source, api_id)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(symbol, name, category, apiSource, apiId).run()
+      INSERT OR IGNORE INTO assets (symbol, name, category)
+      VALUES (?, ?, ?)
+    `).bind(symbol, name, category).run()
     
     return c.json({ 
       success: true, 
@@ -6415,7 +6657,10 @@ app.post('/api/watchlist', async (c) => {
     })
   } catch (error) {
     console.error('Error adding to watchlist:', error)
-    return c.json({ error: 'Error adding to watchlist' }, 500)
+    return c.json({ 
+      error: 'Error adding to watchlist: ' + error.message,
+      details: error.stack 
+    }, 500)
   }
 })
 
@@ -6482,7 +6727,7 @@ app.get('/import', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Importar Datos</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -6497,65 +6742,66 @@ app.get('/import', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
 
-                    <div class="flex items-center space-x-4">
-                        <button onclick="logout()" class="px-4 py-2 text-sm rounded-lg border executive-border hover:bg-slate-700 hover:bg-opacity-50 transition-all font-medium text-slate-300">
-                            <i class="fas fa-sign-out-alt mr-2"></i>
-                            Logout
-                        </button>
-                    </div>
                 </div>
             </div>
         </nav>
@@ -6577,11 +6823,11 @@ app.get('/import', (c) => {
             <div class="mb-8">
                 <div class="flex bg-slate-800 bg-opacity-50 rounded-xl p-1">
                     <button onclick="switchImportType('history')" id="historyTab" class="flex-1 px-6 py-3 rounded-lg bg-blue-600 text-white font-medium transition-all">
-                        <i class="fas fa-chart-line mr-2"></i>
+                        <i class="fas fa-tachometer-alt mr-2"></i>
                         Historial Diario
                     </button>
                     <button onclick="switchImportType('transactions')" id="transactionsTab" class="flex-1 px-6 py-3 rounded-lg text-slate-300 hover:text-white font-medium transition-all">
-                        <i class="fas fa-exchange-alt mr-2"></i>
+                        <i class="fas fa-receipt mr-2"></i>
                         Transacciones Históricas
                     </button>
                 </div>
@@ -6859,7 +7105,7 @@ app.get('/import', (c) => {
                 <!-- Transactions Import Button -->
                 <div id="transactionsImportActions" class="hidden text-center">
                     <button onclick="processTransactionsImport()" id="transactionsImportBtn" class="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg hover:from-purple-700 hover:to-purple-900 transition-all font-medium text-lg">
-                        <i class="fas fa-exchange-alt mr-2"></i>
+                        <i class="fas fa-receipt mr-2"></i>
                         Importar Transacciones Históricas
                     </button>
                     
@@ -6882,7 +7128,7 @@ app.get('/import', (c) => {
                 
                 <div class="mt-6 text-center">
                     <a href="/" class="px-6 py-3 bg-gradient-to-r from-green-600 to-green-800 text-white rounded-lg hover:from-green-700 hover:to-green-900 transition-all font-medium">
-                        <i class="fas fa-chart-line mr-2"></i>
+                        <i class="fas fa-tachometer-alt mr-2"></i>
                         Ver Dashboard Actualizado
                     </a>
                 </div>
@@ -7193,7 +7439,7 @@ app.get('/import', (c) => {
                     console.error('Import error:', error);
                     showError('Error al importar transacciones: ' + (error.response?.data?.error || error.message));
                     importBtn.disabled = false;
-                    importBtn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i>Importar Transacciones Históricas';
+                    importBtn.innerHTML = '<i class="fas fa-receipt mr-2"></i>Importar Transacciones Históricas';
                     importProgress.classList.add('hidden');
                 }
             }
@@ -7531,7 +7777,7 @@ app.get('/import', (c) => {
                 if (type === 'transactions') {
                     html += '<div class="space-y-4">';
                     html += '<div class="bg-green-900 bg-opacity-30 border border-green-600 rounded-lg p-4">';
-                    html += '<h4 class="text-lg font-medium text-green-400 mb-2"><i class="fas fa-exchange-alt mr-2"></i>Transacciones Procesadas</h4>';
+                    html += '<h4 class="text-lg font-medium text-green-400 mb-2"><i class="fas fa-receipt mr-2"></i>Transacciones Procesadas</h4>';
                     html += '<p class="text-sm text-green-300">✅ ' + (results.imported || 0) + ' transacciones importadas exitosamente</p>';
                     if (results.skipped > 0) {
                         html += '<p class="text-sm text-yellow-300">⏭️ ' + results.skipped + ' transacciones omitidas (duplicadas)</p>';
@@ -7547,7 +7793,7 @@ app.get('/import', (c) => {
                     // Original history results
                     html += '<div class="space-y-4">';
                     html += '<div class="bg-green-900 bg-opacity-30 border border-green-600 rounded-lg p-4">';
-                    html += '<h4 class="text-lg font-medium text-green-400 mb-2"><i class="fas fa-chart-line mr-2"></i>Datos Importados</h4>';
+                    html += '<h4 class="text-lg font-medium text-green-400 mb-2"><i class="fas fa-tachometer-alt mr-2"></i>Datos Importados</h4>';
                     html += '<p class="text-sm text-green-300">✅ ' + (results.imported || 0) + ' registros históricos procesados</p>';
                     if (results.skipped > 0) {
                         html += '<p class="text-sm text-yellow-300">⏭️ ' + results.skipped + ' registros omitidos</p>';
@@ -7576,6 +7822,21 @@ app.get('/import', (c) => {
                     .catch(() => window.location.href = '/login');
             }
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -7583,6 +7844,10 @@ app.get('/import', (c) => {
 
 // API endpoint for processing daily snapshots import
 app.post('/api/import/daily-snapshots', async (c) => {
+  let importedCount = 0
+  let skippedCount = 0
+  let assetsProcessed = new Set()
+  
   try {
     const { records, options } = await c.req.json()
     const { DB } = c.env
@@ -7592,10 +7857,6 @@ app.post('/api/import/daily-snapshots', async (c) => {
     if (!records || !Array.isArray(records) || records.length === 0) {
       return c.json({ error: 'No valid records provided' }, 400)
     }
-
-    let importedCount = 0
-    let skippedCount = 0
-    let assetsProcessed = new Set()
 
     // Clear existing data if requested (but NEVER delete transactions)
     if (options.clearExisting) {
@@ -7613,8 +7874,8 @@ app.post('/api/import/daily-snapshots', async (c) => {
         // await DB.prepare('DELETE FROM transactions').run()
         console.log('⚠️ Transactions preserved (NOT deleted)')
         
-        await DB.prepare('DELETE FROM price_history').run()
-        console.log('✅ Price history cleared')
+        // Price history table doesn't exist yet - skipping
+        console.log('⚠️ Price history table not implemented')
         
         // Only delete assets that have no transactions
         const assetsWithTransactions = await DB.prepare(`
@@ -7644,7 +7905,8 @@ app.post('/api/import/daily-snapshots', async (c) => {
     }
 
     // Process each record
-    for (const record of records) {
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
       try {
         // Parse date from dd/mm/aa format to YYYY-MM-DD
         const [day, month, yearShort] = record.fecha.split('/')
@@ -7708,8 +7970,8 @@ app.post('/api/import/daily-snapshots', async (c) => {
         const snapshotQuery = `
           INSERT OR REPLACE INTO daily_snapshots (
             asset_symbol, snapshot_date, quantity, 
-            price_per_unit, total_value, unrealized_pnl
-          ) VALUES (?, ?, ?, ?, ?, 0)
+            price_per_unit, total_value
+          ) VALUES (?, ?, ?, ?, ?)
         `
         
         await DB.prepare(snapshotQuery).bind(
@@ -7760,19 +8022,15 @@ app.post('/api/import/daily-snapshots', async (c) => {
           INSERT OR REPLACE INTO holdings (
             asset_symbol, 
             quantity, 
-            avg_purchase_price,
-            total_invested,
+            average_price,
             current_value,
-            unrealized_pnl,
             last_updated
-          ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+          ) VALUES (?, ?, ?, ?, datetime('now'))
         `).bind(
           snapshot.asset_symbol,
           snapshot.quantity,
           snapshot.price_per_unit,
-          snapshot.total_value, // Using total_value as invested
-          snapshot.total_value, // Current value same as total
-          0, // PnL calculation can be done later
+          snapshot.total_value
         ).run()
         
         console.log(`✅ Holding created: ${snapshot.asset_symbol} - ${snapshot.quantity} @ $${snapshot.price_per_unit}`)
@@ -8144,7 +8402,7 @@ app.get('/asset/:symbol', (c) => {
         <meta http-equiv="Pragma" content="no-cache">
         <meta http-equiv="Expires" content="0">
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -8160,63 +8418,66 @@ app.get('/asset/:symbol', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-star mr-2"></i>
-                                Watchlist
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
@@ -9489,6 +9750,21 @@ app.get('/asset/:symbol', (c) => {
                 }
             }
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -9503,7 +9779,7 @@ app.get('/wallet', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Portfolio</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
@@ -9518,67 +9794,63 @@ app.get('/wallet', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
-                            </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
                 </div>
             </div>
         </nav>
@@ -9792,7 +10064,7 @@ app.get('/wallet', (c) => {
                             '</div>' +
                             '<div class="mt-4 pt-4 border-t border-white border-opacity-20">' +
                                 '<button onclick="viewAsset(&quot;' + safeSymbol + '&quot;)" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors">' +
-                                    '<i class="fas fa-chart-line mr-2"></i>Ver Detalles' +
+                                    '<i class="fas fa-tachometer-alt mr-2"></i>Ver Detalles' +
                                 '</button>' +
                             '</div>' +
                         '</div>';
@@ -9815,6 +10087,21 @@ app.get('/wallet', (c) => {
                 }
             }
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -9876,7 +10163,7 @@ app.get('/asset/:symbol', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - ${symbol}</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -9890,7 +10177,7 @@ app.get('/asset/:symbol', (c) => {
                 <div class="flex justify-between items-center">
                     <div class="flex items-center space-x-8">
                         <h1 class="text-2xl font-bold text-blue-600">
-                            <i class="fas fa-chart-line mr-2"></i>
+                            <i class="fas fa-tachometer-alt mr-2"></i>
                             GusBit
                         </h1>
                         <nav class="flex space-x-6">
@@ -10003,7 +10290,7 @@ app.get('/asset/:symbol', (c) => {
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold text-gray-800">
-                            <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                            <i class="fas fa-tachometer-alt mr-2 text-blue-600"></i>
                             Precio vs Tiempo
                         </h3>
                         <div class="flex space-x-2">
@@ -10021,7 +10308,7 @@ app.get('/asset/:symbol', (c) => {
                 <div class="bg-white rounded-xl shadow-sm p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-semibold text-gray-800">
-                            <i class="fas fa-chart-area mr-2 text-green-600"></i>
+                            <i class="fas fa-globe-americas mr-2 text-green-600"></i>
                             Valor en USD vs Tiempo
                         </h3>
                         <div class="flex space-x-2">
@@ -11070,7 +11357,7 @@ app.get('/asset/:symbol', (c) => {
                             <!-- Market Price Chart -->
                             <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-xl p-6 border border-white border-opacity-20">
                                 <h3 class="text-xl font-bold text-white mb-4">
-                                    <i class="fas fa-chart-line mr-2"></i>
+                                    <i class="fas fa-tachometer-alt mr-2"></i>
                                     Precio de Mercado - \${assetData?.symbol || 'N/A'}
                                 </h3>
                                 <div class="h-64">
@@ -11429,833 +11716,21 @@ app.get('/asset/:symbol', (c) => {
                 }
             }
         </script>
-    </body>
-    </html>
-  `)
-})
-
-// Crypto Hub Route
-app.get('/crypto', async (c) => {
-  return c.html(`
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>GusBit - Crypto Hub</title>
-        <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <link href="/static/styles.css" rel="stylesheet">
-        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    </head>
-    <body class="min-h-screen">
         
-        <!-- HEADER ESTÁNDAR -->
-        <nav class="nav-modern">
-            <div class="max-w-7xl mx-auto px-8 py-4">
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center space-x-12">
-                        <div class="flex items-center space-x-4">
-                            <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            CRYPTO DERIVATIVES<br>
-                                            ANALYTICS HUB
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
-                            </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
-                            </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
-                            </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
-                            </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
-                            </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg bg-orange-600 text-white font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
-                            </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-star mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
-                        </nav>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div class="relative">
-                            <i class="fas fa-bell text-slate-400 text-xl cursor-pointer hover:text-white transition-colors"></i>
-                            <span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">3</span>
-                        </div>
-                        <div class="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full cursor-pointer hover:scale-110 transition-transform"></div>
-                    </div>
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
                 </div>
             </div>
-        </nav>
-
-        <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-8 py-8">
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-12">
-                <div>
-                    <h1 class="text-5xl font-bold text-white mb-2" style="text-shadow: 0 0 12px rgba(251, 146, 60, 0.4);">
-                        <i class="fab fa-bitcoin mr-4 text-orange-500"></i>
-                        Crypto Derivatives Hub
-                    </h1>
-                    <p class="text-xl executive-text-secondary">
-                        Análisis completo de derivados crypto, liquidaciones, funding rates y sentiment del mercado
-                    </p>
-                </div>
-                <button onclick="refreshAllCryptoData()" class="executive-bg-orange text-white px-8 py-4 rounded-xl hover:bg-orange-700 transition-all duration-200 flex items-center executive-shadow font-medium">
-                    <i class="fas fa-sync mr-3"></i>
-                    Actualizar Datos
-                </button>
-            </div>
-
-            <!-- Crypto Market Overview - Key Metrics -->
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-12">
-                <!-- Bitcoin Dominance -->
-                <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fab fa-bitcoin mr-2 text-orange-500"></i>
-                            BTC.D
-                        </h3>
-                        <span id="btc-dominance-trend" class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">...</span>
-                    </div>
-                    <div id="btc-dominance" class="text-2xl font-bold executive-text-primary">...</div>
-                    <div class="text-sm executive-text-secondary mt-1">Bitcoin Dominance</div>
-                </div>
-
-                <!-- Fear & Greed Index -->
-                <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fas fa-thermometer-half mr-2 text-red-500"></i>
-                            F&G
-                        </h3>
-                        <span id="fear-greed-level" class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">...</span>
-                    </div>
-                    <div id="fear-greed-value" class="text-2xl font-bold executive-text-primary">...</div>
-                    <div class="text-sm executive-text-secondary mt-1">Crypto Fear & Greed</div>
-                </div>
-
-                <!-- Total Market Cap -->
-                <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fas fa-coins mr-2 text-yellow-500"></i>
-                            Market Cap
-                        </h3>
-                        <span id="market-cap-change" class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">...</span>
-                    </div>
-                    <div id="total-market-cap" class="text-2xl font-bold executive-text-primary">...</div>
-                    <div class="text-sm executive-text-secondary mt-1">Total Crypto Market</div>
-                </div>
-
-                <!-- 24h Volume -->
-                <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fas fa-chart-bar mr-2 text-purple-500"></i>
-                            24h Volume
-                        </h3>
-                        <span id="volume-trend" class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">...</span>
-                    </div>
-                    <div id="total-volume" class="text-2xl font-bold executive-text-primary">...</div>
-                    <div class="text-sm executive-text-secondary mt-1">Global Volume</div>
-                </div>
-
-                <!-- DeFi TVL -->
-                <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fas fa-layer-group mr-2 text-indigo-500"></i>
-                            DeFi TVL
-                        </h3>
-                        <span id="tvl-change" class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-medium">...</span>
-                    </div>
-                    <div id="defi-tvl" class="text-2xl font-bold executive-text-primary">...</div>
-                    <div class="text-sm executive-text-secondary mt-1">Total Value Locked</div>
-                </div>
-            </div>
-
-            <!-- Main Content Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-                <!-- Liquidations & News -->
-                <div class="lg:col-span-2 space-y-8">
-                    <!-- Liquidation Heatmap -->
-                    <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                        <div class="flex items-center justify-between mb-6">
-                            <h2 class="text-3xl font-bold text-white" style="text-shadow: 0 0 8px rgba(239, 68, 68, 0.3);">
-                                <i class="fas fa-fire mr-3 text-red-500"></i>
-                                Liquidaciones 24h
-                            </h2>
-                            <div class="text-right">
-                                <div id="total-liquidations" class="text-2xl font-bold text-red-400">...</div>
-                                <div class="text-sm text-gray-400">Total Liquidated</div>
-                            </div>
-                        </div>
-                        
-                        <div id="liquidationData" class="space-y-4">
-                            <!-- Liquidation data will be populated here -->
-                            <div class="animate-pulse">
-                                <div class="h-6 bg-gray-300 rounded w-3/4 mb-3"></div>
-                                <div class="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-                                <div class="h-6 bg-gray-300 rounded w-2/3 mb-3"></div>
-                                <div class="h-4 bg-gray-200 rounded w-1/3"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Crypto News -->
-                    <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                        <div class="flex items-center justify-between mb-6">
-                            <h2 class="text-3xl font-bold text-white" style="text-shadow: 0 0 8px rgba(251, 146, 60, 0.3);">
-                                <i class="fas fa-newspaper mr-3 text-orange-500"></i>
-                                Noticias Crypto
-                            </h2>
-                            <a href="https://www.coindesk.com/" target="_blank" class="text-orange-400 hover:text-orange-300 text-sm font-medium">
-                                Ver todas en CoinDesk
-                                <i class="fas fa-external-link-alt ml-1"></i>
-                            </a>
-                        </div>
-                        
-                        <div id="cryptoNews" class="space-y-4">
-                            <!-- Crypto news will be populated here -->
-                            <div class="animate-pulse">
-                                <div class="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
-                                <div class="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-                                <div class="h-4 bg-gray-300 rounded w-2/3 mb-2"></div>
-                                <div class="h-3 bg-gray-200 rounded w-1/3"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Derivatives Analytics -->
-                <div class="space-y-6">
-                    <!-- Funding Rates -->
-                    <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                        <h3 class="text-xl font-bold text-white mb-4" style="text-shadow: 0 0 6px rgba(34, 197, 94, 0.3);">
-                            <i class="fas fa-percentage mr-2 text-green-500"></i>
-                            Funding Rates
-                        </h3>
-                        <div id="fundingRates" class="space-y-3">
-                            <!-- Funding rates will be populated here -->
-                            <div class="animate-pulse">
-                                <div class="h-4 bg-gray-300 rounded mb-2"></div>
-                                <div class="h-4 bg-gray-300 rounded mb-2"></div>
-                                <div class="h-4 bg-gray-300 rounded"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Open Interest -->
-                    <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                        <h3 class="text-xl font-bold text-white mb-4" style="text-shadow: 0 0 6px rgba(59, 130, 246, 0.3);">
-                            <i class="fas fa-chart-pie mr-2 text-blue-500"></i>
-                            Open Interest
-                        </h3>
-                        <div id="openInterest" class="space-y-3">
-                            <!-- Open interest will be populated here -->
-                            <div class="animate-pulse">
-                                <div class="h-4 bg-gray-300 rounded mb-2"></div>
-                                <div class="h-4 bg-gray-300 rounded mb-2"></div>
-                                <div class="h-4 bg-gray-300 rounded"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Long/Short Ratios -->
-                    <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
-                        <h3 class="text-xl font-bold text-white mb-4" style="text-shadow: 0 0 6px rgba(168, 85, 247, 0.3);">
-                            <i class="fas fa-balance-scale mr-2 text-purple-500"></i>
-                            Long/Short Ratios
-                        </h3>
-                        <div id="longShortRatios" class="space-y-3">
-                            <!-- Long/short ratios will be populated here -->
-                            <div class="animate-pulse">
-                                <div class="h-4 bg-gray-300 rounded mb-2"></div>
-                                <div class="h-4 bg-gray-300 rounded mb-2"></div>
-                                <div class="h-4 bg-gray-300 rounded"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Top Performers & DeFi Protocols -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                <!-- Top Crypto Gainers/Losers -->
-                <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                    <h3 class="text-2xl font-bold text-white mb-6" style="text-shadow: 0 0 6px rgba(34, 197, 94, 0.3);">
-                        <i class="fas fa-rocket mr-3 text-green-500"></i>
-                        Top Crypto Performance
-                    </h3>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <button onclick="setCryptoFilter('gainers')" id="gainers-btn" class="crypto-filter-btn active bg-green-600 text-white px-4 py-2 rounded-lg">
-                            <i class="fas fa-arrow-up mr-2"></i>Gainers
-                        </button>
-                        <button onclick="setCryptoFilter('losers')" id="losers-btn" class="crypto-filter-btn bg-gray-600 text-white px-4 py-2 rounded-lg">
-                            <i class="fas fa-arrow-down mr-2"></i>Losers
-                        </button>
-                    </div>
-                    
-                    <div id="cryptoPerformance" class="space-y-4">
-                        <!-- Crypto performance will be populated here -->
-                    </div>
-                </div>
-
-                <!-- Top DeFi Protocols -->
-                <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                    <h3 class="text-2xl font-bold text-white mb-6" style="text-shadow: 0 0 6px rgba(168, 85, 247, 0.3);">
-                        <i class="fas fa-layer-group mr-3 text-purple-500"></i>
-                        Top DeFi Protocols
-                    </h3>
-                    <div id="defiProtocols" class="space-y-4">
-                        <!-- DeFi protocols will be populated here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Advanced Crypto Analytics Tools -->
-            <div class="executive-card executive-border executive-shadow p-8 rounded-xl mb-8">
-                <h2 class="text-3xl font-bold text-white mb-8" style="text-shadow: 0 0 8px rgba(59, 130, 246, 0.3);">
-                    <i class="fas fa-microscope mr-3 text-blue-500"></i>
-                    Herramientas de Análisis Avanzado
-                </h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <!-- Liquidation Calculator -->
-                    <div class="bg-gradient-to-br from-red-500 to-pink-600 p-6 rounded-xl text-white hover:scale-105 transition-transform cursor-pointer" onclick="openLiquidationCalculator()">
-                        <i class="fas fa-calculator text-3xl mb-4"></i>
-                        <h4 class="font-bold text-lg mb-2">Calculadora de Liquidación</h4>
-                        <p class="text-sm opacity-90">Calcula niveles de liquidación para tus posiciones</p>
-                    </div>
-
-                    <!-- Funding Rate Tracker -->
-                    <div class="bg-gradient-to-br from-green-500 to-emerald-600 p-6 rounded-xl text-white hover:scale-105 transition-transform cursor-pointer" onclick="openFundingTracker()">
-                        <i class="fas fa-chart-line text-3xl mb-4"></i>
-                        <h4 class="font-bold text-lg mb-2">Tracker de Funding</h4>
-                        <p class="text-sm opacity-90">Monitorea funding rates en tiempo real</p>
-                    </div>
-
-                    <!-- Whale Alerts -->
-                    <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-xl text-white hover:scale-105 transition-transform cursor-pointer" onclick="openWhaleAlerts()">
-                        <i class="fas fa-fish text-3xl mb-4"></i>
-                        <h4 class="font-bold text-lg mb-2">Alertas de Ballenas</h4>
-                        <p class="text-sm opacity-90">Movimientos grandes en blockchain</p>
-                    </div>
-
-                    <!-- Arbitrage Opportunities -->
-                    <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-6 rounded-xl text-white hover:scale-105 transition-transform cursor-pointer" onclick="openArbitrage()">
-                        <i class="fas fa-exchange-alt text-3xl mb-4"></i>
-                        <h4 class="font-bold text-lg mb-2">Arbitraje</h4>
-                        <p class="text-sm opacity-90">Encuentra oportunidades entre exchanges</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script>
-            let currentCryptoFilter = 'gainers';
-            
-            // Initialize Crypto Hub
-            document.addEventListener('DOMContentLoaded', function() {
-                initializeCryptoHub();
-            });
-
-            function initializeCryptoHub() {
-                loadCryptoOverview();
-                loadLiquidationData();
-                loadCryptoNews();
-                loadDerivativesData();
-                loadCryptoPerformance();
-                loadDeFiProtocols();
-            }
-
-            // Load crypto market overview data
-            async function loadCryptoOverview() {
-                try {
-                    // Load Fear & Greed Index
-                    const fearGreedResponse = await fetch('https://api.alternative.me/fng/');
-                    if (fearGreedResponse.ok) {
-                        const fearGreedData = await fearGreedResponse.json();
-                        const fgIndex = fearGreedData.data[0];
-                        
-                        document.getElementById('fear-greed-value').textContent = fgIndex.value;
-                        document.getElementById('fear-greed-level').textContent = fgIndex.value_classification.toUpperCase();
-                        
-                        // Update color based on value
-                        const levelEl = document.getElementById('fear-greed-level');
-                        if (fgIndex.value < 25) {
-                            levelEl.className = 'bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium';
-                        } else if (fgIndex.value < 45) {
-                            levelEl.className = 'bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium';
-                        } else if (fgIndex.value < 55) {
-                            levelEl.className = 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium';
-                        } else if (fgIndex.value < 75) {
-                            levelEl.className = 'bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium';
-                        } else {
-                            levelEl.className = 'bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium';
-                        }
-                    }
-
-                    // Load global crypto data
-                    const globalResponse = await fetch('https://api.coingecko.com/api/v3/global');
-                    if (globalResponse.ok) {
-                        const globalData = await globalResponse.json();
-                        const data = globalData.data;
-                        
-                        // Bitcoin Dominance
-                        document.getElementById('btc-dominance').textContent = data.market_cap_percentage.btc.toFixed(1) + '%';
-                        
-                        // Total Market Cap
-                        document.getElementById('total-market-cap').textContent = '$' + (data.total_market_cap.usd / 1e12).toFixed(2) + 'T';
-                        
-                        // 24h Volume
-                        document.getElementById('total-volume').textContent = '$' + (data.total_volume.usd / 1e9).toFixed(0) + 'B';
-                        
-                        // Market cap change
-                        const mcChange = data.market_cap_change_percentage_24h_usd;
-                        const mcChangeEl = document.getElementById('market-cap-change');
-                        mcChangeEl.textContent = (mcChange > 0 ? '+' : '') + mcChange.toFixed(2) + '%';
-                        mcChangeEl.className = \`\${mcChange >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-2 py-1 rounded text-xs font-medium\`;
-                    }
-
-                    // Simulate DeFi TVL (you can replace with actual DeFiLlama API)
-                    document.getElementById('defi-tvl').textContent = '$94.2B';
-                    document.getElementById('tvl-change').textContent = '+2.1%';
-                    
-                } catch (error) {
-                    console.error('Error loading crypto overview:', error);
-                }
-            }
-
-            // Load liquidation data
-            async function loadLiquidationData() {
-                try {
-                    // Simulate liquidation data (you can replace with actual Binance liquidation stream)
-                    const liquidationData = [
-                        { symbol: 'BTCUSDT', side: 'LONG', quantity: '12.456', value: '$1,240,320', time: '2 min ago' },
-                        { symbol: 'ETHUSDT', side: 'SHORT', quantity: '245.78', value: '$890,450', time: '5 min ago' },
-                        { symbol: 'SOLUSDT', side: 'LONG', quantity: '1,456.23', value: '$287,890', time: '8 min ago' },
-                        { symbol: 'ADAUSDT', side: 'SHORT', quantity: '45,678', value: '$156,740', time: '12 min ago' },
-                        { symbol: 'DOGEUSDT', side: 'LONG', quantity: '234,567', value: '$78,950', time: '15 min ago' }
-                    ];
-                    
-                    let totalLiquidated = 0;
-                    let html = '';
-                    
-                    liquidationData.forEach((liq, index) => {
-                        const value = parseFloat(liq.value.replace(/[$,]/g, ''));
-                        totalLiquidated += value;
-                        
-                        const sideColor = liq.side === 'LONG' ? 'text-red-500' : 'text-green-500';
-                        const sideBg = liq.side === 'LONG' ? 'bg-red-100' : 'bg-green-100';
-                        
-                        html += \`
-                            <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                                <div class="flex items-center space-x-3">
-                                    <div class="text-lg font-bold text-gray-800">\${liq.symbol}</div>
-                                    <span class="\${sideBg} \${sideColor} px-2 py-1 rounded text-xs font-bold">\${liq.side}</span>
-                                </div>
-                                <div class="text-right">
-                                    <div class="font-bold text-gray-900">\${liq.value}</div>
-                                    <div class="text-xs text-gray-600">\${liq.quantity} • \${liq.time}</div>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    
-                    document.getElementById('liquidationData').innerHTML = html;
-                    document.getElementById('total-liquidations').textContent = '$' + (totalLiquidated / 1e6).toFixed(1) + 'M';
-                    
-                } catch (error) {
-                    console.error('Error loading liquidation data:', error);
-                }
-            }
-
-            // Load crypto news
-            async function loadCryptoNews() {
-                try {
-                    // Fetch crypto-specific news
-                    const response = await fetch('/api/financial-news');
-                    const data = await response.json();
-                    
-                    if (data.articles && data.articles.length > 0) {
-                        // Filter for crypto-related news
-                        const cryptoNews = data.articles.filter(article => 
-                            article.title.toLowerCase().includes('crypto') ||
-                            article.title.toLowerCase().includes('bitcoin') ||
-                            article.title.toLowerCase().includes('ethereum') ||
-                            article.title.toLowerCase().includes('blockchain') ||
-                            article.description.toLowerCase().includes('cryptocurrency')
-                        ).slice(0, 4);
-                        
-                        let html = '';
-                        cryptoNews.forEach(article => {
-                            const timeAgo = getTimeAgo(article.publishedAt);
-                            html += \`
-                                <div class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border-l-4 border-orange-500"
-                                     onclick="window.open('\${article.url}', '_blank')">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <h4 class="font-bold text-gray-900 leading-tight text-sm">\${article.title}</h4>
-                                        <span class="text-xs text-gray-500 ml-4 whitespace-nowrap flex-shrink-0">\${timeAgo}</span>
-                                    </div>
-                                    <p class="text-gray-700 text-sm mb-3">\${article.description || 'Latest crypto market news'}</p>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">\${article.source?.name || 'Crypto News'}</span>
-                                        <i class="fas fa-external-link-alt text-gray-400 text-xs"></i>
-                                    </div>
-                                </div>
-                            \`;
-                        });
-                        
-                        if (html) {
-                            document.getElementById('cryptoNews').innerHTML = html;
-                        } else {
-                            throw new Error('No crypto news found');
-                        }
-                    } else {
-                        throw new Error('No news data');
-                    }
-                    
-                } catch (error) {
-                    console.error('Error loading crypto news:', error);
-                    
-                    // Fallback crypto news
-                    const fallbackNews = [
-                        {
-                            title: "Bitcoin ETF Sees Record Inflows as Institutional Adoption Accelerates",
-                            description: "Spot Bitcoin ETFs recorded their highest single-day inflow as institutional investors increase cryptocurrency allocations.",
-                            url: "https://www.coindesk.com/markets/bitcoin-etf-inflows",
-                            source: { name: "CoinDesk" },
-                            time: "2 hours ago"
-                        },
-                        {
-                            title: "Ethereum Layer 2 Solutions See 300% Growth in Transaction Volume",
-                            description: "Polygon, Arbitrum, and Optimism report significant increases in DeFi and NFT activity.",
-                            url: "https://www.coindesk.com/tech/ethereum-layer2-growth",
-                            source: { name: "The Block" },
-                            time: "4 hours ago"
-                        },
-                        {
-                            title: "DeFi Total Value Locked Surpasses $95 Billion Milestone",
-                            description: "Decentralized finance protocols continue to attract capital despite regulatory uncertainties.",
-                            url: "https://www.coindesk.com/business/defi-tvl-milestone",
-                            source: { name: "CoinDesk" },
-                            time: "6 hours ago"
-                        }
-                    ];
-                    
-                    let html = '';
-                    fallbackNews.forEach(article => {
-                        html += \`
-                            <div class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border-l-4 border-orange-500"
-                                 onclick="window.open('\${article.url}', '_blank')">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="font-bold text-gray-900 leading-tight text-sm">\${article.title}</h4>
-                                    <span class="text-xs text-gray-500 ml-4 whitespace-nowrap flex-shrink-0">\${article.time}</span>
-                                </div>
-                                <p class="text-gray-700 text-sm mb-3">\${article.description}</p>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">\${article.source.name}</span>
-                                    <i class="fas fa-external-link-alt text-gray-400 text-xs"></i>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    
-                    document.getElementById('cryptoNews').innerHTML = html;
-                }
-            }
-
-            // Load derivatives data
-            async function loadDerivativesData() {
-                try {
-                    // Simulate funding rates data
-                    const fundingRates = [
-                        { symbol: 'BTC-PERP', rate: 0.0156, trend: 'up' },
-                        { symbol: 'ETH-PERP', rate: 0.0089, trend: 'down' },
-                        { symbol: 'SOL-PERP', rate: 0.0234, trend: 'up' },
-                        { symbol: 'ADA-PERP', rate: -0.0045, trend: 'down' }
-                    ];
-                    
-                    let fundingHtml = '';
-                    fundingRates.forEach(rate => {
-                        const isPositive = rate.rate >= 0;
-                        const colorClass = isPositive ? 'text-green-600' : 'text-red-600';
-                        
-                        fundingHtml += \`
-                            <div class="flex justify-between items-center">
-                                <span class="executive-text-secondary text-sm">\${rate.symbol}</span>
-                                <div class="text-right">
-                                    <span class="font-bold executive-text-primary \${colorClass}">\${(rate.rate * 100).toFixed(3)}%</span>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    document.getElementById('fundingRates').innerHTML = fundingHtml;
-                    
-                    // Simulate open interest data
-                    const openInterest = [
-                        { symbol: 'BTC', oi: '2.45B', change: 5.6 },
-                        { symbol: 'ETH', oi: '1.89B', change: -2.1 },
-                        { symbol: 'SOL', oi: '456M', change: 12.3 }
-                    ];
-                    
-                    let oiHtml = '';
-                    openInterest.forEach(oi => {
-                        const isPositive = oi.change >= 0;
-                        const colorClass = isPositive ? 'text-green-500' : 'text-red-500';
-                        
-                        oiHtml += \`
-                            <div class="flex justify-between items-center">
-                                <span class="executive-text-secondary text-sm">\${oi.symbol}</span>
-                                <div class="text-right">
-                                    <span class="font-bold executive-text-primary">$\${oi.oi}</span>
-                                    <span class="\${colorClass} text-xs ml-2">\${isPositive ? '+' : ''}\${oi.change}%</span>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    document.getElementById('openInterest').innerHTML = oiHtml;
-                    
-                    // Simulate long/short ratios
-                    const longShort = [
-                        { symbol: 'BTC', long: 67, short: 33 },
-                        { symbol: 'ETH', long: 54, short: 46 },
-                        { symbol: 'SOL', long: 72, short: 28 }
-                    ];
-                    
-                    let lsHtml = '';
-                    longShort.forEach(ls => {
-                        lsHtml += \`
-                            <div class="flex justify-between items-center">
-                                <span class="executive-text-secondary text-sm">\${ls.symbol}</span>
-                                <div class="text-right">
-                                    <div class="text-xs">
-                                        <span class="text-green-600">\${ls.long}% L</span> / 
-                                        <span class="text-red-600">\${ls.short}% S</span>
-                                    </div>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    document.getElementById('longShortRatios').innerHTML = lsHtml;
-                    
-                } catch (error) {
-                    console.error('Error loading derivatives data:', error);
-                }
-            }
-
-            // Load crypto performance
-            async function loadCryptoPerformance() {
-                try {
-                    const response = await fetch('/api/market-data');
-                    const data = await response.json();
-                    
-                    if (data.success && data.data && data.data.topGainers) {
-                        displayCryptoPerformance(data.data.topGainers, data.data.topLosers);
-                    } else {
-                        throw new Error('No crypto performance data');
-                    }
-                    
-                } catch (error) {
-                    console.error('Error loading crypto performance:', error);
-                    
-                    // Fallback data
-                    const fallbackGainers = [
-                        { symbol: 'SOL', name: 'Solana', changePercent: 8.45, category: 'crypto' },
-                        { symbol: 'ADA', name: 'Cardano', changePercent: 5.67, category: 'crypto' },
-                        { symbol: 'DOT', name: 'Polkadot', changePercent: 4.32, category: 'crypto' }
-                    ];
-                    
-                    const fallbackLosers = [
-                        { symbol: 'DOGE', name: 'Dogecoin', changePercent: -3.21, category: 'crypto' },
-                        { symbol: 'SHIB', name: 'Shiba Inu', changePercent: -2.87, category: 'crypto' },
-                        { symbol: 'MATIC', name: 'Polygon', changePercent: -1.95, category: 'crypto' }
-                    ];
-                    
-                    displayCryptoPerformance(fallbackGainers, fallbackLosers);
-                }
-            }
-
-            function displayCryptoPerformance(gainers, losers) {
-                const data = currentCryptoFilter === 'gainers' ? gainers : losers;
-                const container = document.getElementById('cryptoPerformance');
-                
-                let html = '';
-                data.slice(0, 5).forEach((crypto, index) => {
-                    const isPositive = crypto.changePercent >= 0;
-                    const colorClass = isPositive ? 'text-green-600' : 'text-red-600';
-                    const icon = isPositive ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
-                    
-                    html += \`
-                        <div class="flex items-center justify-between p-4 bg-white rounded-lg shadow">
-                            <div class="flex items-center space-x-3">
-                                <div class="text-sm font-bold text-gray-400">#\${index + 1}</div>
-                                <div>
-                                    <h5 class="font-bold text-gray-900">\${crypto.symbol}</h5>
-                                    <p class="text-xs text-gray-600">\${crypto.name}</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="flex items-center \${colorClass}">
-                                    <i class="\${icon} mr-1 text-xs"></i>
-                                    <span class="text-sm font-medium">\${Math.abs(crypto.changePercent).toFixed(2)}%</span>
-                                </div>
-                            </div>
-                        </div>
-                    \`;
-                });
-                
-                container.innerHTML = html;
-            }
-
-            function setCryptoFilter(filter) {
-                currentCryptoFilter = filter;
-                
-                // Update button states
-                document.getElementById('gainers-btn').className = filter === 'gainers' 
-                    ? 'crypto-filter-btn active bg-green-600 text-white px-4 py-2 rounded-lg'
-                    : 'crypto-filter-btn bg-gray-600 text-white px-4 py-2 rounded-lg';
-                    
-                document.getElementById('losers-btn').className = filter === 'losers'
-                    ? 'crypto-filter-btn active bg-red-600 text-white px-4 py-2 rounded-lg'
-                    : 'crypto-filter-btn bg-gray-600 text-white px-4 py-2 rounded-lg';
-                
-                loadCryptoPerformance();
-            }
-
-            // Load DeFi protocols
-            async function loadDeFiProtocols() {
-                try {
-                    // Simulate DeFi protocol data
-                    const defiProtocols = [
-                        { name: 'Uniswap V3', tvl: '4.2B', change: 5.6, category: 'DEX' },
-                        { name: 'Aave V3', tvl: '3.8B', change: -1.2, category: 'Lending' },
-                        { name: 'MakerDAO', tvl: '3.1B', change: 2.4, category: 'CDP' },
-                        { name: 'Compound', tvl: '2.9B', change: 0.8, category: 'Lending' },
-                        { name: 'Curve Finance', tvl: '2.7B', change: -0.5, category: 'DEX' }
-                    ];
-                    
-                    let html = '';
-                    defiProtocols.forEach((protocol, index) => {
-                        const isPositive = protocol.change >= 0;
-                        const colorClass = isPositive ? 'text-green-600' : 'text-red-600';
-                        
-                        html += \`
-                            <div class="flex items-center justify-between p-4 bg-white rounded-lg shadow">
-                                <div class="flex items-center space-x-3">
-                                    <div class="text-sm font-bold text-gray-400">#\${index + 1}</div>
-                                    <div>
-                                        <h5 class="font-bold text-gray-900">\${protocol.name}</h5>
-                                        <p class="text-xs text-gray-600">\${protocol.category}</p>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="font-bold text-gray-900">$\${protocol.tvl}</div>
-                                    <div class="\${colorClass} text-xs">
-                                        \${isPositive ? '+' : ''}\${protocol.change}%
-                                    </div>
-                                </div>
-                            </div>
-                        \`;
-                    });
-                    
-                    document.getElementById('defiProtocols').innerHTML = html;
-                    
-                } catch (error) {
-                    console.error('Error loading DeFi protocols:', error);
-                }
-            }
-
-            // Utility functions
-            function getTimeAgo(publishedAt) {
-                const now = new Date();
-                const pubDate = new Date(publishedAt);
-                const diffInHours = Math.floor((now - pubDate) / (1000 * 60 * 60));
-                
-                if (diffInHours < 1) return 'Hace menos de 1 hora';
-                if (diffInHours === 1) return 'Hace 1 hora';
-                if (diffInHours < 24) return \`Hace \${diffInHours} horas\`;
-                
-                const diffInDays = Math.floor(diffInHours / 24);
-                if (diffInDays === 1) return 'Hace 1 día';
-                return \`Hace \${diffInDays} días\`;
-            }
-
-            function refreshAllCryptoData() {
-                document.querySelector('button[onclick="refreshAllCryptoData()"]').innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i>Actualizando...';
-                
-                Promise.all([
-                    loadCryptoOverview(),
-                    loadLiquidationData(),
-                    loadCryptoNews(),
-                    loadDerivativesData(),
-                    loadCryptoPerformance(),
-                    loadDeFiProtocols()
-                ]).finally(() => {
-                    document.querySelector('button[onclick="refreshAllCryptoData()"]').innerHTML = '<i class="fas fa-sync mr-3"></i>Actualizar Datos';
-                });
-            }
-
-            // Advanced tools functions
-            function openLiquidationCalculator() {
-                alert('Calculadora de Liquidación - Funcionalidad próximamente');
-            }
-
-            function openFundingTracker() {
-                alert('Tracker de Funding - Funcionalidad próximamente');
-            }
-
-            function openWhaleAlerts() {
-                alert('Alertas de Ballenas - Funcionalidad próximamente');
-            }
-
-            function openArbitrage() {
-                alert('Herramienta de Arbitraje - Funcionalidad próximamente');
-            }
-        </script>
+        </button>
     </body>
     </html>
   `)
@@ -12270,7 +11745,7 @@ app.get('/prices', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Markets Hub</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -12286,58 +11761,66 @@ app.get('/prices', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
+
                 </div>
             </div>
         </nav>
@@ -12361,7 +11844,7 @@ app.get('/prices', async (c) => {
                 <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fas fa-chart-line mr-2 text-blue-500"></i>
+                            <i class="fas fa-tachometer-alt mr-2 text-blue-500"></i>
                             S&P 500
                         </h3>
                         <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">+0.85%</span>
@@ -12400,7 +11883,7 @@ app.get('/prices', async (c) => {
                 <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fab fa-bitcoin mr-2 text-orange-500"></i>
+                            <i class="fas fa-coins mr-2 text-orange-500"></i>
                             BTC
                         </h3>
                         <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">+2.15%</span>
@@ -12465,29 +11948,51 @@ app.get('/prices', async (c) => {
             </div>
 
             <!-- Market Overview Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                 <!-- Top Gainers -->
-                <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                    <h3 class="text-2xl font-bold executive-text-primary mb-6">
-                        <i class="fas fa-arrow-up text-green-500 mr-2"></i>Top Gainers 24h
-                    </h3>
-                    <div id="topGainers" class="space-y-3">
-                        <div class="text-center text-slate-400 py-8">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>Cargando datos del mercado...</p>
+                <div class="executive-card executive-border executive-shadow p-8 rounded-xl group relative overflow-hidden">
+                    <!-- Gradient overlay -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-green-600/10 via-emerald-500/5 to-teal-600/10 opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-2xl font-bold text-white mb-0" style="text-shadow: 0 0 8px rgba(34, 197, 94, 0.4);">
+                                <i class="fas fa-rocket mr-3 text-green-400 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300"></i>
+                                Top Gainers 24h
+                            </h3>
+                            <button onclick="loadMarketMovers()" class="bg-green-600/20 hover:bg-green-500/30 text-green-300 hover:text-white px-4 py-2 rounded-lg backdrop-blur-sm border border-green-500/30 hover:border-green-400/50 transition-all duration-300 text-sm font-medium">
+                                <i class="fas fa-sync mr-2"></i>Refresh
+                            </button>
+                        </div>
+                        <div id="topGainers" class="space-y-3">
+                            <div class="text-center executive-text-secondary py-8">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2 text-green-400"></i>
+                                <p>Cargando datos del mercado...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Top Losers -->
-                <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                    <h3 class="text-2xl font-bold executive-text-primary mb-6">
-                        <i class="fas fa-arrow-down text-red-500 mr-2"></i>Top Losers 24h
-                    </h3>
-                    <div id="topLosers" class="space-y-3">
-                        <div class="text-center text-slate-400 py-8">
-                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                            <p>Cargando datos del mercado...</p>
+                <div class="executive-card executive-border executive-shadow p-8 rounded-xl group relative overflow-hidden">
+                    <!-- Gradient overlay -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-red-600/10 via-pink-500/5 to-rose-600/10 opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-2xl font-bold text-white mb-0" style="text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);">
+                                <i class="fas fa-chart-line-down mr-3 text-red-400 group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300"></i>
+                                Top Losers 24h
+                            </h3>
+                            <button onclick="loadMarketMovers()" class="bg-red-600/20 hover:bg-red-500/30 text-red-300 hover:text-white px-4 py-2 rounded-lg backdrop-blur-sm border border-red-500/30 hover:border-red-400/50 transition-all duration-300 text-sm font-medium">
+                                <i class="fas fa-sync mr-2"></i>Refresh
+                            </button>
+                        </div>
+                        <div id="topLosers" class="space-y-3">
+                            <div class="text-center executive-text-secondary py-8">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2 text-red-400"></i>
+                                <p>Cargando datos del mercado...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -12593,40 +12098,21 @@ app.get('/prices', async (c) => {
                 </div>
             </div>
 
-            <!-- Market Movers -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                <!-- Top Gainers -->
-                <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
+            <!-- Market Performance Analytics Header -->
+            <div class="executive-card executive-border executive-shadow p-8 rounded-xl mb-8 relative overflow-hidden group">
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-cyan-500/5 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
+                
+                <div class="relative z-10">
                     <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-2xl font-bold text-white" style="text-shadow: 0 0 6px rgba(34, 197, 94, 0.3);">
-                            <i class="fas fa-rocket mr-3 text-green-500"></i>
-                            Top Gainers
-                        </h3>
-                        <button onclick="loadMarketMovers()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all">
-                            <i class="fas fa-sync mr-1"></i>
-                            Actualizar
+                        <h2 class="text-3xl font-bold text-white" style="text-shadow: 0 0 8px rgba(59, 130, 246, 0.4);">
+                            <i class="fas fa-chart-area mr-4 text-blue-400 group-hover:scale-110 group-hover:pulse transition-all duration-300"></i>
+                            Market Performance Analytics
+                        </h2>
+                        <button onclick="refreshAllMarketData()" class="bg-blue-600/20 hover:bg-blue-500/30 text-blue-300 hover:text-white px-6 py-3 rounded-xl backdrop-blur-sm border border-blue-500/30 hover:border-blue-400/50 transition-all duration-300 font-medium transform hover:-translate-y-1 hover:scale-105">
+                            <i class="fas fa-sync mr-3"></i>Actualizar Todo
                         </button>
                     </div>
-                    <div id="topGainers" class="space-y-4">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                </div>
-
-                <!-- Top Losers -->
-                <div class="executive-card executive-border executive-shadow p-8 rounded-xl">
-                    <div class="flex items-center justify-between mb-6">
-                        <h3 class="text-2xl font-bold text-white" style="text-shadow: 0 0 6px rgba(239, 68, 68, 0.3);">
-                            <i class="fas fa-arrow-trend-down mr-3 text-red-500"></i>
-                            Top Losers
-                        </h3>
-                        <button onclick="loadMarketMovers()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all">
-                            <i class="fas fa-sync mr-1"></i>
-                            Actualizar
-                        </button>
-                    </div>
-                    <div id="topLosers" class="space-y-4">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
+                    <p class="executive-text-secondary text-lg">Análisis en tiempo real de los activos con mejor y peor rendimiento del mercado</p>
                 </div>
             </div>
 
@@ -12703,7 +12189,9 @@ app.get('/prices', async (c) => {
                     '<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">' +
                         '<div class="lg:col-span-2">' +
                             '<div class="flex items-center space-x-4 mb-6">' +
-                                '<i class="fas fa-coins text-4xl text-blue-500"></i>' +
+                                '<div class="w-16 h-16 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full flex items-center justify-center text-4xl">' +
+                                    getAssetIcon(asset.symbol, asset.category) +
+                                '</div>' +
                                 '<div>' +
                                     '<h3 class="text-2xl font-bold text-white">' + asset.symbol + '</h3>' +
                                     '<p class="text-slate-300">' + asset.name + '</p>' +
@@ -12731,7 +12219,7 @@ app.get('/prices', async (c) => {
                                 '<i class="fas fa-star mr-2"></i>Agregar a Watchlist' +
                             '</button>' +
                             '<a href="/asset/' + asset.symbol + '" class="block w-full bg-slate-600 hover:bg-slate-500 text-white px-6 py-3 rounded-lg font-medium transition-all text-center">' +
-                                '<i class="fas fa-chart-line mr-2"></i>Ver Detalles' +
+                                '<i class="fas fa-tachometer-alt mr-2"></i>Ver Detalles' +
                             '</a>' +
                         '</div>' +
                     '</div>';
@@ -12765,6 +12253,33 @@ app.get('/prices', async (c) => {
                 }
             }
             
+            // Get asset icon (CANDADO - NO TOCAR)
+            function getAssetIcon(symbol, category) {
+                const iconMap = {
+                    'AAPL': '<i class="fab fa-apple"></i>',
+                    'BTC': '<i class="fab fa-bitcoin text-orange-500"></i>',
+                    'ETH': '<i class="fab fa-ethereum"></i>',
+                    'TSLA': '<i class="fas fa-car"></i>',
+                    'MSFT': '<i class="fab fa-microsoft text-blue-600"></i>',
+                    'GOOGL': '<i class="fab fa-google"></i>',
+                    'AMZN': '<i class="fab fa-amazon"></i>',
+                    'META': '<i class="fab fa-facebook"></i>',
+                    'NVDA': '<i class="fas fa-microchip text-green-500"></i>',
+                    'XRP': '<i class="fas fa-coins text-blue-400"></i>',
+                    'SOL': '<i class="fas fa-sun text-yellow-500"></i>',
+                    'ADA': '<i class="fas fa-heart text-blue-500"></i>'
+                };
+                
+                if (iconMap[symbol]) return iconMap[symbol];
+                
+                switch(category) {
+                    case 'crypto': return '<i class="fab fa-bitcoin"></i>';
+                    case 'stocks': return '<i class="fas fa-building"></i>';
+                    case 'etfs': return '<i class="fas fa-chart-line"></i>';
+                    default: return '<i class="fas fa-coins"></i>';
+                }
+            }
+
             // Initialize
             document.addEventListener('DOMContentLoaded', function() {
                 // Enter key search
@@ -12970,36 +12485,47 @@ app.get('/prices', async (c) => {
                     const changePercent = asset.changePercent || asset.change || 0;
                     const isPositive = changePercent >= 0;
                     
-                    // Determine colors based on actual performance, not the colorType
-                    const colorClass = isPositive ? 'text-green-600' : 'text-red-600';
-                    const icon = isPositive ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+                    // Glassmorphism colors based on performance
+                    const bgGradient = isPositive 
+                        ? 'bg-gradient-to-r from-green-600/10 via-emerald-500/5 to-teal-600/10' 
+                        : 'bg-gradient-to-r from-red-600/10 via-pink-500/5 to-rose-600/10';
+                    const borderColor = isPositive ? 'border-green-400/30' : 'border-red-400/30';
+                    const hoverBorder = isPositive ? 'hover:border-green-400/50' : 'hover:border-red-400/50';
+                    const textColor = isPositive ? 'text-green-400' : 'text-red-400';
+                    const icon = isPositive ? 'fas fa-trending-up' : 'fas fa-trending-down';
+                    const shadowColor = isPositive ? 'hover:shadow-green-500/25' : 'hover:shadow-red-500/25';
                     
                     html += 
-                        '<div class="flex items-center justify-between p-4 bg-white rounded-lg shadow hover:shadow-md transition-all cursor-pointer border-l-4 ' + (isPositive ? 'border-green-500' : 'border-red-500') + '">' +
-                            '<div class="flex items-center space-x-3">' +
-                                '<div class="text-sm font-bold text-gray-400">#' + (index + 1) + '</div>' +
-                                '<i class="fas fa-coins text-gray-400"></i>' +
-                                '<div>' +
-                                    '<h5 class="font-bold text-gray-900">' + asset.symbol + '</h5>' +
-                                    '<p class="text-xs text-gray-600">' + asset.name + '</p>' +
+                        '<div class="group relative overflow-hidden backdrop-blur-sm border ' + borderColor + ' ' + hoverBorder + ' rounded-xl p-4 ' + bgGradient + ' hover:shadow-2xl ' + shadowColor + ' transform hover:-translate-y-1 hover:scale-102 transition-all duration-500 cursor-pointer">' +
+                            '<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>' +
+                            '<div class="relative z-10 flex items-center justify-between">' +
+                                '<div class="flex items-center space-x-3">' +
+                                    '<div class="text-sm font-bold executive-text-secondary">#' + (index + 1) + '</div>' +
+                                    '<div class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-lg group-hover:scale-110 transition-all duration-300">' +
+                                        getAssetIcon(asset.symbol, asset.category) +
+                                    '</div>' +
+                                    '<div>' +
+                                        '<h5 class="font-bold executive-text-primary group-hover:text-white transition-colors duration-300">' + asset.symbol + '</h5>' +
+                                        '<p class="text-xs executive-text-secondary">' + asset.name + '</p>' +
+                                    '</div>' +
                                 '</div>' +
-                            '</div>' +
-                            '<div class="text-right">' +
-                                '<div class="font-bold text-gray-900">' + 
-                                    (asset.price > 0 ? '$' + asset.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A') +
-                                '</div>' +
-                                '<div class="flex items-center justify-end ' + colorClass + '">' +
-                                    '<i class="' + icon + ' mr-1 text-xs"></i>' +
-                                    '<span class="text-sm font-medium">' + Math.abs(changePercent).toFixed(2) + '%</span>' +
+                                '<div class="text-right">' +
+                                    '<div class="font-bold executive-text-primary group-hover:text-white transition-colors duration-300">' + 
+                                        (asset.price > 0 ? '$' + asset.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A') +
+                                    '</div>' +
+                                    '<div class="flex items-center justify-end ' + textColor + ' group-hover:scale-110 transition-all duration-300">' +
+                                        '<i class="' + icon + ' mr-2 text-sm group-hover:animate-pulse"></i>' +
+                                        '<span class="font-bold">' + Math.abs(changePercent).toFixed(2) + '%</span>' +
+                                    '</div>' +
                                 '</div>' +
                             '</div>' +
                         '</div>';
                 });
                 
                 container.innerHTML = html || 
-                    '<div class="text-center py-6 text-gray-500">' +
-                        '<i class="fas fa-chart-line text-2xl mb-2"></i>' +
-                        '<p>No hay datos disponibles</p>' +
+                    '<div class="text-center py-8 executive-text-secondary">' +
+                        '<i class="fas fa-chart-line text-3xl mb-3 text-slate-400"></i>' +
+                        '<p class="font-medium">No hay datos disponibles</p>' +
                     '</div>';
             }
 
@@ -13149,6 +12675,21 @@ app.get('/prices', async (c) => {
                 box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
             }
         </style>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -13165,7 +12706,7 @@ app.get('/prices-with-complex-js', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Markets Hub</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <link href="/static/styles.css" rel="stylesheet">
@@ -13181,67 +12722,48 @@ app.get('/prices-with-complex-js', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
                         <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-tachometer-alt mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Dashboard</span>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-receipt mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Transacciones</span>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-chart-pie mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Portfolio</span>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+                            <a href="/import" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-file-import mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Importar</span>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/prices" class="relative px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-700 text-white font-bold text-base shadow-2xl shadow-blue-500/50 border-2 border-cyan-400/50 backdrop-blur-sm overflow-hidden">
+                                <i class="fas fa-chart-area mr-3 text-base"></i>
+                                <span class="font-semibold">Markets</span>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-coins mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Crypto Hub</span>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-bookmark mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Watchlist</span>
                             </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
+                            <a href="/analysis" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-tachometer-alt mr-2"></i>
                                 Análisis
                             </a>
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
@@ -13275,7 +12797,7 @@ app.get('/prices-with-complex-js', async (c) => {
                 <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fas fa-chart-line mr-2 text-blue-500"></i>
+                            <i class="fas fa-tachometer-alt mr-2 text-blue-500"></i>
                             S&P 500
                         </h3>
                         <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">+0.85%</span>
@@ -13314,7 +12836,7 @@ app.get('/prices-with-complex-js', async (c) => {
                 <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fab fa-bitcoin mr-2 text-orange-500"></i>
+                            <i class="fas fa-coins mr-2 text-orange-500"></i>
                             BTC
                         </h3>
                         <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">+2.15%</span>
@@ -14310,7 +13832,7 @@ app.get('/prices-with-complex-js', async (c) => {
                             </button>
                             <button onclick="viewInPortfolio('\${asset.symbol}')"
                                     class="w-full bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-all">
-                                <i class="fas fa-chart-line mr-2"></i>
+                                <i class="fas fa-tachometer-alt mr-2"></i>
                                 Ver en Portfolio
                             </button>
                             <a href="https://finance.yahoo.com/quote/\${asset.symbol}" target="_blank"
@@ -14507,6 +14029,21 @@ app.get('/prices-with-complex-js', async (c) => {
                 transform: translateY(-1px);
             }
         </style>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -14641,7 +14178,7 @@ async function createDailySnapshot(DB, asset, currentPrice = null) {
     // Update asset's current price
     await DB.prepare(`
       UPDATE assets 
-      SET current_price = ?, price_updated_at = ?, updated_at = ?
+      SET current_price = ?, last_updated = ?, updated_at = ?
       WHERE symbol = ?
     `).bind(
       pricePerUnit,
@@ -15132,7 +14669,7 @@ app.post('/api/import/csv', async (c) => {
       for (const [symbol, data] of latestPrices) {
         await c.env.DB.prepare(`
           UPDATE assets 
-          SET current_price = ?, price_updated_at = CURRENT_TIMESTAMP
+          SET current_price = ?, last_updated = CURRENT_TIMESTAMP
           WHERE symbol = ?
         `).bind(data.price, symbol).run()
         priceUpdateCount++
@@ -15229,15 +14766,15 @@ app.get('/crypto', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Crypto Hub</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <link href="/static/styles.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link href="/static/styles.css" rel="stylesheet">
     </head>
     <body class="min-h-screen">
-        
+    
         <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
@@ -15245,75 +14782,73 @@ app.get('/crypto', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg bg-orange-600 text-white font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-star mr-2"></i>
-                                Watchlist
-                            </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
-                            </a>
+
                         </nav>
                     </div>
-                    <div>
-                        <a href="/logout" class="text-slate-300 hover:text-white transition-colors text-sm">
-                            <i class="fas fa-sign-out-alt mr-2"></i>
-                            Salir
-                        </a>
-                    </div>
+
                 </div>
             </div>
         </nav>
 
         <!-- Main Content -->
-        <div class="container mx-auto px-6 py-8">
+        <div class="max-w-7xl mx-auto">
+        <div class="px-8 py-8">
             <!-- Header -->
             <div class="flex items-center justify-between mb-8">
                 <div>
@@ -15323,7 +14858,7 @@ app.get('/crypto', async (c) => {
                     </h1>
                     <p class="executive-text-secondary text-lg">Centro completo de análisis de criptomonedas y derivatives</p>
                 </div>
-                <button onclick="refreshAllCryptoData()" class="executive-bg-orange text-white px-8 py-4 rounded-xl hover:bg-orange-700 transition-all duration-200 flex items-center executive-shadow font-medium">
+                <button onclick="refreshAllCryptoData()" class="bg-orange-600 text-white px-8 py-4 rounded-xl hover:bg-orange-700 transition-all duration-200 flex items-center font-medium">
                     <i class="fas fa-sync mr-3"></i>
                     Actualizar Datos
                 </button>
@@ -15335,7 +14870,7 @@ app.get('/crypto', async (c) => {
                 <div class="executive-card executive-border executive-shadow p-6 rounded-xl">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-bold executive-text-primary">
-                            <i class="fab fa-bitcoin mr-2 text-orange-500"></i>
+                            <i class="fas fa-coins mr-2 text-orange-500"></i>
                             BTC Dominance
                         </h3>
                         <span id="btc-dominance-badge" class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">0%</span>
@@ -16013,6 +15548,22 @@ app.get('/crypto', async (c) => {
                 return num.toLocaleString();
             }
         </script>
+        </div>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -16035,12 +15586,14 @@ app.get('/watchlist', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Watchlist Operativo</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <link href="/static/styles.css" rel="stylesheet">
     </head>
-    <body class="bg-slate-700 bg-opacity-50 min-h-screen">
+    <body class="min-h-screen">
         <!-- HEADER ESTÁNDAR -->
         <nav class="nav-modern">
             <div class="max-w-7xl mx-auto px-8 py-4">
@@ -16048,69 +15601,73 @@ app.get('/watchlist', (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
-                        <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                        <nav class="hidden md:flex items-center space-x-1">
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-line mr-3 text-lg group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:text-cyan-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Overview</span>
+                                </div>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-green-400/50 hover:shadow-2xl hover:shadow-green-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-green-600/20 via-emerald-500/20 to-teal-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-exchange-alt mr-3 text-lg group-hover:scale-110 group-hover:rotate-180 transition-all duration-300 group-hover:text-green-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Trades</span>
+                                </div>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-yellow-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-briefcase mr-3 text-lg group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300 group-hover:text-amber-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Assets</span>
+                                </div>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-red-400/50 hover:shadow-2xl hover:shadow-red-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-red-600/20 via-pink-500/20 to-rose-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-chart-area mr-3 text-lg group-hover:scale-110 group-hover:pulse transition-all duration-300 group-hover:text-red-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Markets</span>
+                                </div>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-orange-400/50 hover:shadow-2xl hover:shadow-orange-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-orange-600/20 via-amber-500/20 to-yellow-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fab fa-bitcoin mr-3 text-lg group-hover:scale-110 group-hover:rotate-45 transition-all duration-300 group-hover:text-orange-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Crypto</span>
+                                </div>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-500/20 to-fuchsia-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div class="relative flex items-center">
+                                    <i class="fas fa-crosshairs mr-3 text-lg group-hover:scale-110 group-hover:rotate-90 transition-all duration-300 group-hover:text-violet-300"></i>
+                                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Tracker</span>
+                                </div>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
-                            </a>
+
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
 
         <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="max-w-7xl mx-auto">
+        <div class="px-8 py-8">
             <!-- Header -->
             <div class="glass-card p-8 mb-8">
                 <div class="flex justify-between items-start">
@@ -16258,7 +15815,7 @@ app.get('/watchlist', (c) => {
                             <thead class="bg-slate-800 bg-opacity-50">
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                                        <i class="fas fa-chart-line mr-2"></i>Activo
+                                        <i class="fas fa-tachometer-alt mr-2"></i>Activo
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                                         <i class="fas fa-dollar-sign mr-2"></i>Precio
@@ -16579,7 +16136,7 @@ app.get('/watchlist', (c) => {
                                 $\${item.current_price ? parseFloat(item.current_price).toLocaleString('en-US', {minimumFractionDigits: item.current_price < 1 ? 6 : 2}) : 'N/A'}
                             </div>
                             <div class="text-xs text-slate-400">
-                                \${item.price_updated_at ? formatTimeAgo(item.price_updated_at) : 'Sin datos'}
+                                \${item.last_updated ? formatTimeAgo(item.last_updated) : 'Sin datos'}
                             </div>
                         </td>
                         <td class="px-6 py-4">
@@ -17106,6 +16663,7 @@ app.get('/watchlist', (c) => {
                 }
             }
         </script>
+        </div>
     </body>
     </html>
   `)
@@ -17128,7 +16686,7 @@ async function evaluateWatchlistAlerts(DB) {
       SELECT 
         w.*,
         a.current_price,
-        a.price_updated_at
+        a.last_updated
       FROM watchlist w
       LEFT JOIN assets a ON w.asset_symbol = a.symbol
       WHERE w.active_alerts = TRUE 
@@ -17311,7 +16869,7 @@ app.get('/explore/:symbol', async (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>GusBit - Explorar ${symbol}</title>
         <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -17326,32 +16884,21 @@ app.get('/explore/:symbol', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
                         <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>Dashboard
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>Watchlist
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-bookmark mr-2"></i>Watchlist
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>Markets
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-globe-americas mr-2"></i>Markets
                             </a>
                         </nav>
                     </div>
@@ -17359,7 +16906,7 @@ app.get('/explore/:symbol', async (c) => {
                         <button onclick="addToWatchlist()" class="btn-primary">
                             <i class="fas fa-plus mr-2"></i>Agregar a Watchlist
                         </button>
-                        <button onclick="window.close()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
+                        <button onclick="window.close()" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
                             <i class="fas fa-times mr-2"></i>Cerrar
                         </button>
                     </div>
@@ -17424,7 +16971,7 @@ app.get('/explore/:symbol', async (c) => {
             <div class="glass-card p-8 mb-8">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-semibold executive-text-primary">
-                        <i class="fas fa-chart-area mr-2"></i>Gráfica de Precios
+                        <i class="fas fa-globe-americas mr-2"></i>Gráfica de Precios
                     </h3>
                     <div class="flex space-x-2">
                         <button onclick="changeTimeframe('1D')" class="btn-timeframe active" data-timeframe="1D">1D</button>
@@ -17909,6 +17456,21 @@ app.get('/explore/:symbol', async (c) => {
             \`;
             document.head.appendChild(style);
         </script>
+        
+        <!-- BOTÓN SALIR FLOTANTE ESQUINA INFERIOR DERECHA -->
+        <button onclick="logout()" class="fixed bottom-6 right-6 z-50 group">
+            <div class="relative px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-sm shadow-2xl shadow-red-500/50 border border-red-400/50 backdrop-blur-sm overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-2xl hover:shadow-red-500/60">
+                <!-- Efectos hover -->
+                <div class="absolute inset-0 bg-gradient-to-r from-red-500 via-red-400 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                
+                <!-- Contenido del botón -->
+                <div class="relative flex items-center">
+                    <i class="fas fa-power-off mr-2 group-hover:rotate-180 transition-transform duration-300"></i>
+                    <span class="tracking-wide group-hover:tracking-wider transition-all duration-300">Salir</span>
+                </div>
+            </div>
+        </button>
     </body>
     </html>
   `)
@@ -18350,7 +17912,7 @@ app.get('/analysis', async (c) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>GusBit - Análisis de Decisiones</title>
           <!-- TailwindCSS compilado para producción -->
-        <link href="/static/styles.css?v=2.1.0" rel="stylesheet">
+        <link href="/static/styles.css?v=LOGO_FIXED_$(date +%s)" rel="stylesheet">
           <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
           <link href="/static/styles.css" rel="stylesheet">
       </head>
@@ -18363,67 +17925,48 @@ app.get('/analysis', async (c) => {
                     <div class="flex items-center space-x-12">
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-4">
-                                <!-- Logo GusBit con tipografía y spacing optimizados -->
-                                <div class="flex flex-col items-start">
-                                    <!-- GB con formas exactas y spacing perfecto -->
-                                    <div class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 3.2rem; line-height: 0.75; letter-spacing: -0.08em;">
-                                        <span style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">GB</span>
-                                    </div>
-                                    
-                                    <!-- GusBit con el mismo estilo tipográfico -->
-                                    <div class="-mt-1">
-                                        <h1 class="text-white leading-none mb-1" style="font-family: 'Playfair Display', Georgia, serif; font-weight: 900; font-size: 1.8rem; line-height: 0.9; letter-spacing: -0.03em; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">
-                                            GusBit
-                                        </h1>
-                                        
-                                        <!-- Tagline con spacing perfecto -->
-                                        <div class="text-white leading-tight" style="font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.6rem; letter-spacing: 0.12em; line-height: 1.1; opacity: 0.95; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-                                            TRACK STOCKS<br>
-                                            ETFS &amp; CRYPTO
-                                        </div>
-                                    </div>
+                                <!-- Logo GusBit imagen -->
+                                <div class="flex items-center">
+                                    <img src="/static/logo.png" alt="GusBit" class="h-28 w-auto max-w-xs" style="">
                                 </div>
                             </div>
                         </div>
                         <nav class="hidden md:flex space-x-2">
-                            <a href="/" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Dashboard
+                            <a href="/" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-tachometer-alt mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Dashboard</span>
                             </a>
-                            <a href="/transactions" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-exchange-alt mr-2"></i>
-                                Transacciones
+                            <a href="/transactions" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-receipt mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Transacciones</span>
                             </a>
-                            <a href="/wallet" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-briefcase mr-2"></i>
-                                Portfolio
+                            <a href="/wallet" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-chart-pie mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Portfolio</span>
                             </a>
-                            <a href="/import" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-upload mr-2"></i>
-                                Importar
+                            <a href="/import" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-file-import mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Importar</span>
                             </a>
-                            <a href="/prices" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-area mr-2"></i>
-                                Markets
+                            <a href="/prices" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-globe-americas mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Markets</span>
                             </a>
-                            <a href="/crypto" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fab fa-bitcoin mr-2"></i>
-                                Crypto Hub
+                            <a href="/crypto" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-coins mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Crypto Hub</span>
                             </a>
-                            <a href="/watchlist" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-medium text-sm">
-                                <i class="fas fa-crosshairs mr-2"></i>
-                                Watchlist
+                            <a href="/watchlist" class="group relative px-6 py-3.5 rounded-2xl text-slate-300 hover:text-white transition-all duration-500 font-bold text-base overflow-hidden backdrop-blur-sm border border-slate-600/30 hover:border-cyan-400/50 hover:shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105">
+                                <i class="fas fa-bookmark mr-3 text-base group-hover:scale-110 transition-transform"></i>
+                                <span class="font-semibold">Watchlist</span>
                             </a>
-                            <a href="/analysis" class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all font-medium text-sm">
-                                <i class="fas fa-chart-line mr-2"></i>
-                                Análisis
+                            <a href="/analysis" class="relative px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-700 text-white font-bold text-base shadow-2xl shadow-blue-500/50 border-2 border-cyan-400/50 backdrop-blur-sm overflow-hidden">
+                                <i class="fas fa-chart-bar mr-3 text-base"></i>
+                                <span class="font-semibold">Análisis</span>
                             </a>
                         </nav>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-red-600 transition-all font-medium text-sm">
-                        <i class="fas fa-power-off mr-2"></i>
-                        Salir
-                    </button>
+
                 </div>
             </div>
         </nav>
